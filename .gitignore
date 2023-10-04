@@ -164,4 +164,4 @@ readme.txt
 
 # data
 /data/data_raw
-/models/transfromer/loss_anomaly/
+/models/transfromer/loss_anomaly
