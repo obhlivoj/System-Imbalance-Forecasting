@@ -165,3 +165,15 @@ readme.txt
 # data
 /data/data_raw
 /models/transformer/loss_anomaly
+
+# models
+/models/ML/weights_folder
+/models/ML/runs_folder
+/models/ML/loss
+/models/transformer/weights_folder
+/models/transformer/runs_folder
+/models/transformer/loss
+/models/transformer_decoder_only/weights_folder
+/models/transformer_decoder_only/runs_folder
+/models/transformer_decoder_only/loss
+/models/transformer_decoder_only/validation
