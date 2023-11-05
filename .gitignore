@@ -173,7 +173,7 @@ readme.txt
 /models/transformer/weights_folder
 /models/transformer/runs_folder
 /models/transformer/loss
-/models/transfromer_decoder_only/weights_folder/
+/models/transformer_decoder_only/weights_folder/
 /models/transformer_decoder_only/runs_folder/
 /models/transformer_decoder_only/loss/
 /models/transformer_decoder_only/validation/
