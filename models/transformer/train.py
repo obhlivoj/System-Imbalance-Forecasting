@@ -17,8 +17,20 @@ import pickle
 
 from torch.utils.tensorboard import SummaryWriter
 
+def write_loss(run: int, train_loss: float, val_loss: float):
+    folder_path = f'./loss/run{run}/'
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
 
-def greedy_decode(model, source, source_mask, decoder_in, scaler, device):
+    train_file = f'training_loss.txt'
+    val_file = f'val_loss.txt'
+
+    paths = {f'{folder_path}{train_file}': train_loss, f'{folder_path}{val_file}': val_loss}
+    for path, loss in paths.items():
+        with open(path, 'a') as file:
+            file.write(str(f'{loss:.2f}')+"\n")
+
+def greedy_decode(model, config, source, source_mask, decoder_in, scaler, device):
 
     # precompute the encoder output and reuse it for every token we get from the decoder
     encoder_output = model.encode(source, source_mask)
@@ -32,7 +44,7 @@ def greedy_decode(model, source, source_mask, decoder_in, scaler, device):
     decoder_input = decoder_in[:,0:1,:].type_as(source).to(device)
     # print("Decoder input:")
     # print("---shape:", decoder_input.shape)                                                                                                                                                                                                                                                                                                                                
-    for _ in range(decoder_in.shape[1]):
+    for _ in range(config['val_seq_len']):
 
         # build a mask for the target (decoder input)
         decoder_mask = causal_mask(decoder_input.size(1)).type_as(source_mask).to(device)
@@ -69,7 +81,7 @@ def greedy_decode(model, source, source_mask, decoder_in, scaler, device):
     return pred
 
 
-def run_validation(model, validation_dataloader, scaler, device, print_msg, global_step, writer, epoch):
+def run_validation(model, config, validation_dataloader, scaler, device, print_msg, global_step, writer, epoch):
     model.eval()
     count = 0
 
@@ -84,7 +96,7 @@ def run_validation(model, validation_dataloader, scaler, device, print_msg, glob
             encoder_mask = batch['encoder_mask'].to(device)
             decoder_input = batch['decoder_input'].to(device)
 
-            model_out = greedy_decode(model, encoder_input, encoder_mask, decoder_input, scaler, device)
+            model_out = greedy_decode(model, config, encoder_input, encoder_mask, decoder_input, scaler, device)
 
             src_data = batch["x_orig"]
             label = batch["label"]
@@ -101,9 +113,9 @@ def run_validation(model, validation_dataloader, scaler, device, print_msg, glob
             # print_msg(f"{f'PREDICTED: ':>12}{output}")
 
         gt_torch = torch.cat(ground_truth)
-        print("gt_torch size:", gt_torch.shape)
+        #print("gt_torch size:", gt_torch.shape)
         pred_torch = torch.cat(predicted)
-        print("pred_torch size:", pred_torch.shape)
+        #print("pred_torch size:", pred_torch.shape)
 
         loss_fn = nn.MSELoss()
         loss = loss_fn(pred_torch.view(-1), gt_torch.view(-1))
@@ -111,10 +123,10 @@ def run_validation(model, validation_dataloader, scaler, device, print_msg, glob
     txt_msg = f"Validation loss of epoch {epoch}: {loss}"
     print_msg(txt_msg)
 
-    return loss, ground_truth, predicted, src_input
+    return float(loss), ground_truth, predicted, src_input
 
 
-def get_ds(config):
+def get_ds(config, train_bs = None):
     with open(os.path.join(config["path_pickle"], config["data_pickle_name"]), 'rb') as file:
         ds_raw =  pickle.load(file)
     ds_lags, new_vars = create_lags(ds_raw, config["lags"], config["diffs"])
@@ -143,8 +155,11 @@ def get_ds(config):
 
     train_ds = TSDataset(train_scl, config['src_seq_len'], config['tgt_seq_len'])
     val_ds = TSDataset(val_scl, config['src_seq_len'], config['tgt_seq_len'])
-
-    train_dataloader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True)
+    
+    if train_bs:
+        train_dataloader = DataLoader(train_ds, batch_size=train_bs, shuffle=True)
+    else:   
+        train_dataloader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True)
     val_dataloader = DataLoader(val_ds, batch_size=config['batch_size']*10, shuffle=False)
     val_dataloader_onebatch = DataLoader(val_ds, batch_size=1, shuffle=True)
 
@@ -223,18 +238,21 @@ def train_model(config):
 
             global_step += 1
         
+
         txt_msg = f"Training loss of epoch {epoch}: {epoch_loss/len(train_dataloader)}"
         batch_iterator.write(txt_msg)
-        if (epoch+1) % 1 == 0:
-            val_loss, _, _, _ = run_validation(model, val_dataloader, scaler, device, lambda msg: batch_iterator.write(msg), global_step, writer, epoch)
+
+        val_loss, _, _, _ = run_validation(model, config, val_dataloader, scaler, device, lambda msg: batch_iterator.write(msg), global_step, writer, epoch)
+
+        write_loss(config['run'], train_loss=epoch_loss/len(train_dataloader), val_loss=val_loss)
 
         # Run validation at the end of every epoch
         # run_validation(model, val_dataloader, tokenizer_src, tokenizer_tgt, config['seq_len'], device, lambda msg: batch_iterator.write(msg), global_step, writer)
 
         # Save the model at the end of every epoch
-        if val_loss < best_loss:
-            best_loss = val_loss
-
+        #if val_loss < best_loss:
+        #    best_loss = val_loss
+        if True:
             model_filename = get_weights_file_path(config, f"{epoch:02d}")
             torch.save({
                 'epoch': epoch,

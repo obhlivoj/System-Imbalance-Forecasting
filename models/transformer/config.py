@@ -17,16 +17,17 @@ def get_config():
             },  
         "diffs": None,
         "batch_size": 64,
-        "num_epochs": 200,
-        "lr": 10**-3,
+        "num_epochs": 15,
+        "lr": 5*10**-3,
         "src_seq_len": 32,
         "tgt_seq_len": 8,
-        #"d_model": 32,
+        "val_seq_len": 8,
         "d_ff": 128,
-        "model_folder": "weights",
+        "model_folder": "weights2",
         "model_basename": "tmodel_",
         "preload": None,
-        "experiment_name": "runs/tmodel"
+        "experiment_name": "runs2/tmodel",
+        "run": 2,
     }
 
 def get_weights_file_path(config, epoch: str):
@@ -34,3 +35,8 @@ def get_weights_file_path(config, epoch: str):
     model_basename = config["model_basename"]
     model_filename = f"{model_basename}{epoch}.pt"
     return str(Path('.') / model_folder / model_filename)
+
+# NOTES:
+    # weights, runs/tmodel, run=0: model s tgt/val_seq_len = 1, num_epochs = 15
+    # weights1, runs1/tmodel, run=1: model s tgt/val_seq_len = 4, num_epochs = 15
+    # weights1, runs2/tmodel, run=2: model s tgt/val_seq_len = 8, num_epochs = 15
