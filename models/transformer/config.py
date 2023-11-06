@@ -16,18 +16,18 @@ def get_config():
             "system_imbalance": [i for i in range(4*24-2*4, 4*24+6*4)] + [i for i in range(7*4*24-2*4, 7*4*24+6*4)]
             },  
         "diffs": None,
-        "batch_size": 64,
+        "batch_size": 128,
         "num_epochs": 15,
-        "lr": 5*10**-3,
+        "lr": 1*10**-4,
         "src_seq_len": 32,
         "tgt_seq_len": 8,
         "val_seq_len": 8,
-        "d_ff": 128,
-        "model_folder": "weights2",
+        "d_ff": 256,
+        "model_folder": "weights",
         "model_basename": "tmodel_",
         "preload": None,
-        "experiment_name": "runs2/tmodel",
-        "run": 2,
+        "experiment_name": "runs/tmodel",
+        "run": "XY_exact",
     }
 
 def get_weights_file_path(config, epoch: str):
@@ -40,3 +40,5 @@ def get_weights_file_path(config, epoch: str):
     # weights, runs/tmodel, run=0: model s tgt/val_seq_len = 1, num_epochs = 15
     # weights1, runs1/tmodel, run=1: model s tgt/val_seq_len = 4, num_epochs = 15
     # weights1, runs2/tmodel, run=2: model s tgt/val_seq_len = 8, num_epochs = 15
+
+    # weightsXY_exact: model s tgt/val_seq_len = 8, num_epochs = 50, lr = 0.0001, bs = 128, dff = 256

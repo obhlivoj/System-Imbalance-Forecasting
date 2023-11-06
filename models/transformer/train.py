@@ -4,7 +4,9 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
+import torch.optim.lr_scheduler as lr_scheduler
+
 
 from transformer_dataset import TSDataset, causal_mask, prepare_time_series_data, scale_data_seq, create_lags
 from model import build_transformer
@@ -34,48 +36,19 @@ def greedy_decode(model, config, source, source_mask, decoder_in, scaler, device
 
     # precompute the encoder output and reuse it for every token we get from the decoder
     encoder_output = model.encode(source, source_mask)
-    # print("Encoder output:")
-    # print("---shape:", encoder_output.shape)
-
-    # print("Decoder in:")
-    # print("---shape:", decoder_in.shape)
-
-    #decoder_input = torch.empty(1,1,1).fill_(decoder_in.view(-1)[0]).type_as(source).to(device)
     decoder_input = decoder_in[:,0:1,:].type_as(source).to(device)
-    # print("Decoder input:")
-    # print("---shape:", decoder_input.shape)                                                                                                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                                                                                               
     for _ in range(config['val_seq_len']):
 
         # build a mask for the target (decoder input)
         decoder_mask = causal_mask(decoder_input.size(1)).type_as(source_mask).to(device)
-
-        # print("Source:", source)
-        # print("---shape:", source.shape)
-        # print("Encoder output:", encoder_output)
-        # print("---shape:", encoder_output.shape)
-        # print("Decoder input:", decoder_input)
-        # print("---shape:", decoder_input.shape)
-        # print("Decoder mask:", decoder_mask)
-        # print("---shape:", decoder_mask.shape)
-
         # calculate the output of the decoder
         out = model.decode(encoder_output, source_mask, decoder_input, decoder_mask)
-
         # get the next token
         pred = model.project(out)
-        # print("Pred:")
-        # print("---shape:", pred.shape) 
-
         pred_new = pred[:,-1,-1]
-        # print("Pred_new:")
-        # print("---shape:", pred_new.shape)
         scaled_pred = torch.tensor(scaler.transform(pred_new.view(-1,1)))
-        # print("Scaled_pred:")
-        # print("---shape:", scaled_pred.shape)
         decoder_input = torch.cat([decoder_input, scaled_pred.unsqueeze(2).type_as(source).to(device)], dim=1)
-        # print("Decoder input_concat:")
-        # print("---shape:", decoder_input.shape)
-        # print(10*"-", "IT_END", 10*"-")
 
     # prediction "pred" should equal to "decoder_input[1:]", since there is only added the first initialization value
     return pred
@@ -83,7 +56,6 @@ def greedy_decode(model, config, source, source_mask, decoder_in, scaler, device
 
 def run_validation(model, config, validation_dataloader, scaler, device, print_msg, global_step, writer, epoch):
     model.eval()
-    count = 0
 
     src_input = []
     ground_truth = []
@@ -105,17 +77,10 @@ def run_validation(model, config, validation_dataloader, scaler, device, print_m
             src_input.append(src_data)
             ground_truth.append(label)
             predicted.append(output)
-            
-            #Print the source, target and model output
-            # print_msg('-'*console_width)
-            # print_msg(f"{f'SOURCE: ':>12}{src_data}")
-            # print_msg(f"{f'TARGET: ':>12}{label}")
-            # print_msg(f"{f'PREDICTED: ':>12}{output}")
+
 
         gt_torch = torch.cat(ground_truth)
-        #print("gt_torch size:", gt_torch.shape)
         pred_torch = torch.cat(predicted)
-        #print("pred_torch size:", pred_torch.shape)
 
         loss_fn = nn.MSELoss()
         loss = loss_fn(pred_torch.view(-1), gt_torch.view(-1))
@@ -178,13 +143,14 @@ def train_model(config):
     # Make sure the weights folder exists
     Path(config['model_folder']).mkdir(parents=True, exist_ok=True)
 
-    train_dataloader, val_dataloader, scaler, val_dataloader_onebatch = get_ds(config)
+    train_dataloader, val_dataloader, scaler, _ = get_ds(config)
     model = get_model(config).to(device)
 
     # Tensorboard
     writer = SummaryWriter(config['experiment_name'])
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], eps=1e-9)
+    scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.1, total_iters=25)
 
     # If the user specified a model to preload before training, load it
     initial_epoch = 0
@@ -200,8 +166,6 @@ def train_model(config):
 
     loss_fn = nn.MSELoss().to(device)
 
-    best_loss = float('inf')
-    val_loss = float('inf')
     for epoch in range(initial_epoch, config['num_epochs']):
         epoch_loss = 0
         model.train()
@@ -238,6 +202,12 @@ def train_model(config):
 
             global_step += 1
         
+        before_lr = optimizer.param_groups[0]["lr"]
+        scheduler.step()
+        after_lr = optimizer.param_groups[0]["lr"]
+        print("Epoch %d: Adam lr %.6f -> %.6f" % (epoch, before_lr, after_lr))
+
+
 
         txt_msg = f"Training loss of epoch {epoch}: {epoch_loss/len(train_dataloader)}"
         batch_iterator.write(txt_msg)
