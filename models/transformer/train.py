@@ -150,7 +150,7 @@ def train_model(config):
     writer = SummaryWriter(config['experiment_name'])
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], eps=1e-9)
-    scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.1, total_iters=25)
+    scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.01, total_iters=8)
 
     # If the user specified a model to preload before training, load it
     initial_epoch = 0
@@ -206,7 +206,6 @@ def train_model(config):
         scheduler.step()
         after_lr = optimizer.param_groups[0]["lr"]
         print("Epoch %d: Adam lr %.6f -> %.6f" % (epoch, before_lr, after_lr))
-
 
 
         txt_msg = f"Training loss of epoch {epoch}: {epoch_loss/len(train_dataloader)}"
