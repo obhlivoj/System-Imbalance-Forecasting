@@ -1,0 +1,177 @@
+import pandas as pd
+import numpy as np
+
+from typing import Any, Dict, List, Tuple, Union
+import torch
+from torch.utils.data import Dataset
+
+from sklearn.preprocessing import StandardScaler
+from copy import deepcopy
+
+
+class TSDataset(Dataset):
+    """
+    Custom PyTorch Dataset for Time Series data.
+
+    Parameters:
+    - ds (List[dict]): List of dictionaries containing time series data.
+    - src_seq_len (int): Length of the source sequence.
+    - tgt_seq_len (int): Length of the target sequence.
+
+    Returns a dictionary with the following keys:
+    - "encoder_input": Tensor of encoder input data.
+    - "label": Tensor of target labels.
+    - "x_orig": Tensor of the original data.
+    """
+
+    def __init__(self, ds: List[dict], src_seq_len: int, tgt_seq_len: int) -> None:
+        super().__init__()
+        self.ds = ds
+        self.src_seq_len = src_seq_len
+        self.tgt_seq_len = tgt_seq_len
+
+    def __len__(self) -> int:
+        return len(self.ds)
+    
+    def __getitem__(self, index: int) -> dict:
+        datapoint = self.ds[index]
+        enc_input = datapoint['x_input']
+        label = datapoint['y_true']
+        x_orig = datapoint["target_history"]
+
+        assert enc_input.size(0) == self.src_seq_len
+        assert label.size(0) == self.tgt_seq_len
+
+        return {
+            "encoder_input": enc_input,  # (src_seq_len, n_features)
+            "label": label, # (tgt_seq_len, n_tgt)
+            "x_orig": x_orig # (src_seq_len, n_features)
+        }
+    
+    def collate_fn(self, batch: List[dict]) -> dict:
+        # Handle None values for encoder_mask
+        encoder_mask = [item["encoder_mask"] for item in batch]
+        encoder_mask = torch.stack(encoder_mask) if None not in encoder_mask else None
+        
+        # Stack other tensors
+        other_tensors = {
+            key: torch.stack([item[key] for item in batch]) for key in batch[0].keys() if key != "encoder_mask"
+        }
+        
+        return {
+            "encoder_input": other_tensors["encoder_input"],
+            "label": other_tensors["label"],
+            "x_orig": other_tensors["x_orig"]
+        }
+
+def prepare_time_series_data(data: pd.DataFrame, exo_vars: List[str], target: List[str], tgt_step: int, input_seq_len: int, target_seq_len: int) -> Tuple[List[dict], torch.Tensor, torch.Tensor]:
+    """
+    Prepare time series data for modeling.
+
+    Parameters:
+    - data (pd.DataFrame): Pandas DataFrame containing the data.
+    - exo_vars (list): List of exogenous variables.
+    - target (list): List of target variables.
+    - input_seq_len (int): Length of the input sequence.
+    - target_seq_len (int): Length of the target sequence.
+
+    Returns:
+    - data_seq (list): List of dictionaries containing prepared data sequences.
+    - data_tensor (Tensor): Tensor of the entire data array.
+    - label_tensor (Tensor): Tensor of the target labels.
+    """
+    data_array = data[target + exo_vars].values
+    data_label = data[target].values
+
+    data_tensor = torch.tensor(data_array, dtype=torch.float32)
+    label_tensor = torch.tensor(data_label, dtype=torch.float32)
+
+    data_seq = []
+
+    num_obs = len(data_tensor)
+    max_start_idx = num_obs - input_seq_len - target_seq_len - tgt_step + 1
+
+    for start_idx in range(max_start_idx):
+        end_idx = start_idx + input_seq_len
+        x_input_seq = data_tensor[start_idx:end_idx]
+        label_input_seq = label_tensor[start_idx:end_idx]
+        
+        target_start_idx = end_idx - 1
+        target_end_idx = target_start_idx + target_seq_len
+        ground_truth = label_tensor[target_start_idx+tgt_step+1:target_end_idx+tgt_step+1]
+
+        data_seq.append({
+        "x_input" : x_input_seq,
+        "y_true" : ground_truth,
+        "target_history" : label_input_seq,
+        })
+
+    return data_seq, data_tensor, label_tensor
+
+def scale_data_seq(data_tensor: torch.Tensor, label_tensor: torch.Tensor, data_to_scale: Dict[str, List[dict]]) -> Tuple[List[dict], List[dict], List[dict], StandardScaler]:
+    """
+    Scale time series data sequences.
+
+    Parameters:
+    - data_tensor (torch.Tensor): Tensor of the training data array.
+    - label_tensor (torch.Tensor): Tensor of the training labels.
+    - train_ds_index (int): Index separating training and validation/test data.
+    - data_to_scale (dict): Dictionary of data sequences to scale.
+
+    Returns:
+    - train_data (list): Scaled training data sequences.
+    - val_data (list): Scaled validation data sequences.
+    - test_data (list): Scaled test data sequences.
+    """
+    scaled_data = deepcopy(data_to_scale)
+    
+    enc_scaler = StandardScaler()
+    enc_scaler.fit(data_tensor)
+
+    for name, dt in data_to_scale.items():
+        for ind, obs in enumerate(dt):
+            scaled_data[name][ind]['x_input'] = torch.tensor(enc_scaler.transform(obs['x_input']), dtype=torch.float32)
+
+    return [scaled_data[name] for name in data_to_scale.keys()]
+
+# create lags and lagged diffs
+def create_lags(df: pd.DataFrame, lags_dict: Union[None, Dict[str, List[int]]] = None, lagged_difs: Union[None, Dict[str, List[int]]] = None) -> Tuple[pd.DataFrame, List[str]]:
+    """
+    Create lagged variables and lagged differences for specified variables.
+
+    Parameters:
+    - df: Pandas DataFrame containing the data.
+    - lags_dict: A dictionary where keys are variable names, and values are lists of integer lag values.
+      If lags_dict is provided, lagged variables will be created for the specified variables.
+    - lagged_difs: A dictionary where keys are variable names, and values are lists of integer lag values.
+      If lagged_difs is provided, lagged differences will be created for the specified variables.
+
+    Returns:
+    - Pandas DataFrame with lagged variables and lagged differences added as new columns.
+    """
+    new_vars = []
+    data = df.copy()
+    if lags_dict:
+        for variable_name, lag_values in lags_dict.items():
+            for num_lag in lag_values:
+                new_column_name = f"{variable_name}_lag{num_lag}"
+                new_vars.append(new_column_name)
+                data[new_column_name] = data[variable_name].shift(num_lag)
+
+    if lagged_difs:
+        for variable_name, lag_values in lagged_difs.items():
+            for num_lag in lag_values:
+                new_column_name = f"{variable_name}_lag_diff{num_lag}"
+                new_vars.append(new_column_name)
+                data[new_column_name] = data[variable_name].diff(1).shift(num_lag-1)
+
+    return data.dropna(subset=new_vars), new_vars
+
+def get_train_test_set(dataset):
+    x_list, y_list, history = [], [], []
+    for obs in dataset:
+        x_list.append(obs['encoder_input'].flatten().numpy())
+        y_list.append(obs['label'].squeeze(-1).numpy())
+        history.append(obs['x_orig'].squeeze(-1).numpy())
+
+    return np.array(x_list), np.array(y_list), np.array(history)
