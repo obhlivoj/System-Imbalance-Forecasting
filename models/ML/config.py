@@ -13,7 +13,7 @@ def get_config():
         ],
         "target": ["system_imbalance"],
         "lags": {
-            "system_imbalance": [i for i in range(4*24-2*4, 4*24+6*4)] + [i for i in range(7*4*24-2*4, 7*4*24+6*4)]
+            "system_imbalance": [4*24-2*4, 7*4*24-2*4]
             },  
         "diffs": None,
         "batch_size": 64,
@@ -23,11 +23,11 @@ def get_config():
         "tgt_seq_len": 1,
         "hidden_dim": 256,
         "tgt_step": 0,
-        "model_folder": "weights",
+        "model_folder": "weights_folder/weights",
         "model_basename": "tmodel_",
         "preload": None,
         "experiment_name": "runs/tmodel",
-        "run": "X",
+        "run": "XYZ",
     }
 
 def get_weights_file_path(config, epoch: str):

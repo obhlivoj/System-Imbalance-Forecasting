@@ -30,7 +30,7 @@ def write_loss(run: int, train_loss: float, val_loss: float):
         with open(path, 'a') as file:
             file.write(str(f'{loss:.2f}')+"\n")
 
-def run_validation(model, device, validation_dataloader, writer, epoch):
+def run_validation(model, device, validation_dataloader, writer = None, epoch = 0):
     model.eval()
 
     src_input = []
@@ -109,7 +109,7 @@ def get_model(cfg):
     model = MLP(in_dim, cfg["hidden_dim"], cfg["tgt_seq_len"])
     return model
 
-def train_model(cfg):
+def train_model(cfg, save_model: bool = True):
     # define the device on which we train the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
@@ -178,18 +178,53 @@ def train_model(cfg):
         txt_msg = f"Validation loss of epoch {epoch}: {val_loss}"
         batch_iterator.write(txt_msg)
 
-        write_loss(cfg['run'], train_loss=epoch_loss/len(train_dataloader), val_loss=val_loss)
+        if save_model:
+            write_loss(cfg['run'], train_loss=epoch_loss/len(train_dataloader), val_loss=val_loss)
 
 
-        model_filename = get_weights_file_path(cfg, f"{epoch:02d}")
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'global_step': global_step
-        }, model_filename)
+            model_filename = get_weights_file_path(cfg, f"{epoch:02d}")
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'global_step': global_step
+            }, model_filename)
 
     return model
+
+def training_loop(cfg, train_dataloader, val_dataloader):
+    score = []
+    # define the device on which we train the model
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model = get_model(cfg).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg['lr'], eps=1e-9)
+    loss_fn = nn.MSELoss().to(device)
+
+    iterator = tqdm(range(cfg['num_epochs']), postfix={"Train loss": 0.0, "Val loss": 0.0})
+    for _ in iterator:
+        epoch_loss = 0
+        model.train()
+        for batch in train_dataloader:
+            encoder_input = batch['encoder_input'].to(device)
+            output = model(encoder_input)
+            label = batch['label'].to(device)
+
+            # Compute the loss using MSE
+            loss = loss_fn(output.view(-1), label.view(-1))
+            epoch_loss += loss.item()
+
+            # Backpropagate the loss, update the weights
+            loss.backward()
+
+            optimizer.step()
+            optimizer.zero_grad(set_to_none=True)
+        
+        val_loss, _, _, _ = run_validation(model, device, val_dataloader)
+
+        score.append(val_loss)
+
+    return score
 
 if __name__ == '__main__':
     warnings.filterwarnings("ignore")
