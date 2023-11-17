@@ -23,7 +23,7 @@ def get_config():
         "tgt_seq_len": 1,
         "tgt_step": 0,
         "d_ff": 256,
-        "model_folder": "weights",
+        "model_folder": "weights_folder/weights",
         "model_basename": "tmodel_",
         "preload": None,
         "experiment_name": "runs/tmodel",
