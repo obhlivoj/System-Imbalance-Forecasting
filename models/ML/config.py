@@ -29,7 +29,7 @@ def get_config():
         "lr": 10**-3,
         "src_seq_len": 32,
         "tgt_seq_len": 1,
-        "hidden_dim": 128,
+        "hidden_dim": 512,
         "tgt_step": 0,
         "model_folder": "weights_folder/weights",
         "model_basename": "tmodel_",
