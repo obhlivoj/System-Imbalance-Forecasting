@@ -165,3 +165,6 @@ def create_lags(df: pd.DataFrame, lags_dict: Union[None, Dict[str, List[int]]] =
                 data[new_column_name] = data[variable_name].diff(1).shift(num_lag-1)
 
     return data.dropna(subset=new_vars), new_vars
+
+def forward_lags():
+    pass

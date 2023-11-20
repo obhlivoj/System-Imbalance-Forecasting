@@ -248,9 +248,9 @@ def group_data(data, num_models: int = 8):
     for ind in range(len(data['gt'][-1])):
         seq_data.append(
             {
-                "hist": data['hist'][-1].squeeze(-1)[ind].numpy(),
-                "pred": np.array([data['preds'][i][ind].item() for i in range(num_models)]),
-                "true": np.array([data['gt'][i][ind].item() for i in range(num_models)])
+                "hist": data['hist'][-1].squeeze(-1).cpu()[ind].numpy(),
+                "pred": np.array([data['preds'][i].cpu()[ind].item() for i in range(num_models)]),
+                "true": np.array([data['gt'][i].cpu()[ind].item() for i in range(num_models)])
             }
         )
 
@@ -308,9 +308,9 @@ def compute_val_errors(preds_gt: dict, num_models: int):
     for k in range(num_models):
         # get score metrics
         result_dict[f'model_{k+1}'] = {
-            "r2": r2_score(preds_gt['gt'][k].squeeze(-1), preds_gt['preds'][k]),
-            "rmse": mean_squared_error(preds_gt['gt'][k].squeeze(-1), preds_gt['preds'][k], squared=False),
-            "mae": mean_absolute_error(preds_gt['gt'][k].squeeze(-1), preds_gt['preds'][k]),
+            "r2": r2_score(preds_gt['gt'][k].squeeze(-1).cpu(), preds_gt['preds'][k].cpu()),
+            "rmse": mean_squared_error(preds_gt['gt'][k].squeeze(-1).cpu(), preds_gt['preds'][k].cpu(), squared=False),
+            "mae": mean_absolute_error(preds_gt['gt'][k].squeeze(-1).cpu(), preds_gt['preds'][k].cpu()),
             }
 
         print(f'{k+1}\t{result_dict[f"model_{k+1}"]["rmse"]:.2f}\t{result_dict[f"model_{k+1}"]["mae"]:.2f}\t{result_dict[f"model_{k+1}"]["r2"]:.2f}')
