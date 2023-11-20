@@ -38,7 +38,6 @@ class TSDataset(Dataset):
         label = datapoint['y_true']
         x_orig = datapoint["target_history"]
 
-        assert enc_input.size(0) == self.src_seq_len
         assert label.size(0) == self.tgt_seq_len
 
         return {
@@ -63,7 +62,7 @@ class TSDataset(Dataset):
             "x_orig": other_tensors["x_orig"]
         }
 
-def prepare_time_series_data(data: pd.DataFrame, exo_vars: List[str], target: List[str], tgt_step: int, input_seq_len: int, target_seq_len: int) -> Tuple[List[dict], torch.Tensor, torch.Tensor]:
+def prepare_time_series_data(data: pd.DataFrame, cfg) -> Tuple[List[dict], torch.Tensor, torch.Tensor]:
     """
     Prepare time series data for modeling.
 
@@ -79,35 +78,41 @@ def prepare_time_series_data(data: pd.DataFrame, exo_vars: List[str], target: Li
     - data_tensor (Tensor): Tensor of the entire data array.
     - label_tensor (Tensor): Tensor of the target labels.
     """
-    data_array = data[target + exo_vars].values
-    data_label = data[target].values
+    data_array = data[cfg['target'] + cfg['exo_vars']].values
+    data_label = data[cfg['target']].values
 
     data_tensor = torch.tensor(data_array, dtype=torch.float32)
     label_tensor = torch.tensor(data_label, dtype=torch.float32)
 
+    if cfg['forward_lags']:
+        data_fl = data[cfg['target'] + cfg["forward_vars"]].values
+        data_fl_tensor = torch.tensor(data_fl, dtype=torch.float32)
+
     data_seq = []
 
     num_obs = len(data_tensor)
-    max_start_idx = num_obs - input_seq_len - target_seq_len - tgt_step + 1
+    max_start_idx = num_obs - cfg['src_seq_len'] - cfg['tgt_seq_len'] - cfg['tgt_step'] + 1
 
     for start_idx in range(max_start_idx):
-        end_idx = start_idx + input_seq_len
+        end_idx = start_idx + cfg['src_seq_len']
+        end_label_idx = end_idx + cfg['tgt_seq_len'] + cfg['tgt_step']
+
         x_input_seq = data_tensor[start_idx:end_idx]
+        x_forward_lag = data_fl_tensor[end_idx:end_label_idx]
         label_input_seq = label_tensor[start_idx:end_idx]
         
-        target_start_idx = end_idx - 1
-        target_end_idx = target_start_idx + target_seq_len
-        ground_truth = label_tensor[target_start_idx+tgt_step+1:target_end_idx+tgt_step+1]
+        ground_truth = label_tensor[end_idx + cfg['tgt_step']:end_label_idx]
 
         data_seq.append({
-        "x_input" : x_input_seq,
+        "x_input_raw" : x_input_seq,
+        "x_forward_lag" : x_forward_lag,
         "y_true" : ground_truth,
         "target_history" : label_input_seq,
         })
 
-    return data_seq, data_tensor, label_tensor
+    return data_seq, data_tensor
 
-def scale_data_seq(data_tensor: torch.Tensor, label_tensor: torch.Tensor, data_to_scale: Dict[str, List[dict]]) -> Tuple[List[dict], List[dict], List[dict], StandardScaler]:
+def scale_data_seq(cfg, data_tensor: torch.Tensor, data_to_scale: Dict[str, List[dict]]) -> Tuple[List[dict], List[dict], List[dict], StandardScaler]:
     """
     Scale time series data sequences.
 
@@ -129,7 +134,9 @@ def scale_data_seq(data_tensor: torch.Tensor, label_tensor: torch.Tensor, data_t
 
     for name, dt in data_to_scale.items():
         for ind, obs in enumerate(dt):
-            scaled_data[name][ind]['x_input'] = torch.tensor(enc_scaler.transform(obs['x_input']), dtype=torch.float32)
+            x_in = torch.tensor(enc_scaler.transform(obs['x_input_raw']), dtype=torch.float32)
+            x_fl = torch.tensor(enc_scaler.transform(obs['x_forward_lag']), dtype=torch.float32)
+            scaled_data[name][ind]['x_input'] = torch.concat((x_in.flatten(), x_fl[:,len(cfg['target']):].flatten()))
 
     return [scaled_data[name] for name in data_to_scale.keys()]
 
@@ -165,6 +172,3 @@ def create_lags(df: pd.DataFrame, lags_dict: Union[None, Dict[str, List[int]]] =
                 data[new_column_name] = data[variable_name].diff(1).shift(num_lag-1)
 
     return data.dropna(subset=new_vars), new_vars
-
-def forward_lags():
-    pass

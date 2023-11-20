@@ -14,7 +14,7 @@ class MLP(nn.Module):
         nn.init.xavier_uniform_(self.fc2.weight)
 
     def forward(self, x):
-        x = self.fc1(x.view(-1, self.input_dim))
+        x = self.fc1(x)
         x = self.relu(x)
         x = self.dropout(x)
         x = self.fc2(x)

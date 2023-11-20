@@ -11,14 +11,22 @@ def get_config():
                 "most_recent_forecast_load", "measured_&_upscaled_solar",
                 "most_recent_forecast_solar", 'year', 'not_working', 'holiday',
         ],
+        "forward_vars": [
+                "month_sin", "month_cos", "day_sin", "day_cos", "hour_sin", "hour_cos",
+                "quarter_hour_sin", "quarter_hour_cos", "day-ahead_6pm_forecast_wind",
+                "most_recent_forecast_wind", "day-ahead_6pm_forecast_load",
+                "most_recent_forecast_load", "day-ahead_6pm_forecast_solar",
+                "most_recent_forecast_solar", 'year', 'not_working', 'holiday',
+        ],
         "target": ["system_imbalance"],
         "lags": {
             "system_imbalance": [4*24-2*4, 7*4*24-2*4]
             },  
         "diffs": None,
+        "forward_lags": True,
         "batch_size": 64,
-        "num_epochs": 15,
-        "lr": 10**-4,
+        "num_epochs": 50,
+        "lr": 10**-3,
         "src_seq_len": 32,
         "tgt_seq_len": 1,
         "hidden_dim": 128,
@@ -27,7 +35,7 @@ def get_config():
         "model_basename": "tmodel_",
         "preload": None,
         "experiment_name": "runs/tmodel",
-        "run": "XYZ",
+        "run": "no_forward",
     }
 
 def get_weights_file_path(config, epoch: str):

@@ -76,6 +76,8 @@ def get_ds(config, train_bs = None, return_raw = False):
 
     # add new lagged variables to the exo_vars in config
     config["exo_vars"] += new_vars
+    if config["forward_vars"]:
+        config["forward_vars"] += new_vars
     
     # train-val split
     training_split = pd.Timestamp('2023-04-01 00:00:00')
@@ -85,15 +87,15 @@ def get_ds(config, train_bs = None, return_raw = False):
     data_val = ds_lags[lambda x: x.datetime_utc > training_split].copy()
     data_val = data_val.fillna(data_train.median(numeric_only=True))
 
-    train_data_raw, train_data_tensor, train_label_tensor = prepare_time_series_data(data_train, config["exo_vars"], config["target"], config['tgt_step'], config['src_seq_len'], config['tgt_seq_len'])
-    val_data_raw, _, _ = prepare_time_series_data(data_val, config["exo_vars"], config["target"], config['tgt_step'], config['src_seq_len'], config['tgt_seq_len'])
+    train_data_raw, train_data_tensor = prepare_time_series_data(data_train, config)
+    val_data_raw, _ = prepare_time_series_data(data_val, config)
 
     data_to_scale = {
         "train": train_data_raw,
         "val": val_data_raw,
     }
     
-    data_scaled = scale_data_seq(train_data_tensor, train_label_tensor, data_to_scale)
+    data_scaled = scale_data_seq(config, train_data_tensor, data_to_scale)
     train_scl, val_scl = data_scaled
 
     if return_raw:
@@ -112,7 +114,10 @@ def get_ds(config, train_bs = None, return_raw = False):
     return train_dataloader, val_dataloader
 
 def get_model(cfg):
-    in_dim = len(cfg["exo_vars"] + cfg["target"])*cfg["src_seq_len"]
+    if cfg['forward_lags']:
+        in_dim = len(cfg["exo_vars"] + cfg["target"])*cfg["src_seq_len"] + len(cfg["forward_vars"])*(cfg['tgt_step']+cfg["tgt_seq_len"])
+    else:
+        in_dim = len(cfg["exo_vars"] + cfg["target"])*cfg["src_seq_len"]
     model = MLP(in_dim, cfg["hidden_dim"], cfg["tgt_seq_len"])
     return model
 
