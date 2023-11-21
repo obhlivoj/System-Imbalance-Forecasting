@@ -31,6 +31,7 @@ def loss_se(predicted: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
 
     return squared_diff
 
+
 def plot_k_results(cfg: dict, gt: torch.Tensor, pred: torch.Tensor, src_input: torch.Tensor, inds: list) -> None:
     """
     Plot the ground truth and predicted results.
@@ -46,15 +47,18 @@ def plot_k_results(cfg: dict, gt: torch.Tensor, pred: torch.Tensor, src_input: t
         None
     """
     history = [i for i in range(0, cfg['src_seq_len'])]
-    future = [i for i in range(cfg['src_seq_len'], cfg['src_seq_len'] + cfg['tgt_seq_len'])]
+    future = [i for i in range(
+        cfg['src_seq_len'], cfg['src_seq_len'] + cfg['tgt_seq_len'])]
 
     for gt_tensor, pred_tensor, src in zip(gt[inds], pred[inds], src_input[inds]):
         plt.figure()
 
         plt.plot(history, src, label="History", color='g')
         if cfg['tgt_seq_len'] == 1:
-            plt.plot(future, gt_tensor, label="Ground Truth", marker='o', color='b')
-            plt.plot(future, pred_tensor, label="Predicted", marker='o', color='r')
+            plt.plot(future, gt_tensor, label="Ground Truth",
+                     marker='o', color='b')
+            plt.plot(future, pred_tensor, label="Predicted",
+                     marker='o', color='r')
         else:
             plt.plot(future, gt_tensor, label="Ground Truth", color='b')
             plt.plot(future, pred_tensor, label="Predicted", color='r')
@@ -66,6 +70,7 @@ def plot_k_results(cfg: dict, gt: torch.Tensor, pred: torch.Tensor, src_input: t
 
         # Show the plot
         plt.show()
+
 
 def compute_metrics(model, cfg, train_dataloader, val_dataloader, label_scaler, device, result_dict):
     """
@@ -85,9 +90,11 @@ def compute_metrics(model, cfg, train_dataloader, val_dataloader, label_scaler, 
     """
     for tv, dataloader in zip(["train", "val"], [train_dataloader, val_dataloader]):
         # calculate validation data
-        loss, ground_truth, predicted, _ = run_validation(model, cfg, dataloader, label_scaler, device, lambda msg: print(msg), 0, None, 0)
-        ground_truth_tensor, predicted_tensor = torch.cat(ground_truth), torch.cat(predicted)
-        
+        loss, ground_truth, predicted, _ = run_validation(
+            model, cfg, dataloader, label_scaler, device, lambda msg: print(msg), 0, None, 0)
+        ground_truth_tensor, predicted_tensor = torch.cat(
+            ground_truth), torch.cat(predicted)
+
         result_dict[f"{tv}_total_loss"].append(loss)
 
         # get loss for each datapoint
@@ -97,10 +104,11 @@ def compute_metrics(model, cfg, train_dataloader, val_dataloader, label_scaler, 
 
         # get score metrics
         result_dict[f"{tv}_metrics"].append({
-            "r2": r2_score(ground_truth_tensor.squeeze(1,2), predicted_tensor.squeeze(1,2)),
-            "rmse": mean_squared_error(ground_truth_tensor.squeeze(1,2), predicted_tensor.squeeze(1,2), squared=False),
-            "mae": mean_absolute_error(ground_truth_tensor.squeeze(1,2), predicted_tensor.squeeze(1,2)),
+            "r2": r2_score(ground_truth_tensor.squeeze(1, 2), predicted_tensor.squeeze(1, 2)),
+            "rmse": mean_squared_error(ground_truth_tensor.squeeze(1, 2), predicted_tensor.squeeze(1, 2), squared=False),
+            "mae": mean_absolute_error(ground_truth_tensor.squeeze(1, 2), predicted_tensor.squeeze(1, 2)),
         })
+
 
 def create_dict(cfg):
     """
@@ -124,6 +132,7 @@ def create_dict(cfg):
 
     return pred_dict
 
+
 def timestep_prediction_loss(cfg) -> dict:
     """
     Perform timestep prediction loss calculation.
@@ -138,7 +147,8 @@ def timestep_prediction_loss(cfg) -> dict:
     model_names = [f'0{i}'[-2:] for i in range(100)]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_dataloader, val_dataloader, label_scaler, _ = get_ds(cfg, train_bs=1024)
+    train_dataloader, val_dataloader, label_scaler, _ = get_ds(
+        cfg, train_bs=1024)
     model = get_model(cfg).to(device)
 
     num_models = len(os.listdir(cfg['model_folder']))
@@ -148,10 +158,12 @@ def timestep_prediction_loss(cfg) -> dict:
         model_filename = get_weights_file_path(cfg, model_names[k])
         state = torch.load(model_filename)
         model.load_state_dict(state['model_state_dict'])
-    
-        compute_metrics(model, cfg, train_dataloader, val_dataloader, label_scaler, device, pred_dict)
+
+        compute_metrics(model, cfg, train_dataloader,
+                        val_dataloader, label_scaler, device, pred_dict)
 
     return pred_dict
+
 
 def get_best_model(cfg, path_pre: str, num_models: int = 8) -> Tuple[List[float], List[int], Dict[str, Dict[str, List[float]]]]:
     """
@@ -174,7 +186,8 @@ def get_best_model(cfg, path_pre: str, num_models: int = 8) -> Tuple[List[float]
         cfg['run'] = k
 
         gen_path = f'{path_pre}{cfg["run"]}/'
-        loss_paths = [f'{gen_path}training_loss.txt', f'{gen_path}val_loss.txt']
+        loss_paths = [f'{gen_path}training_loss.txt',
+                      f'{gen_path}val_loss.txt']
 
         files = {f'train_{k}': None, f'val_{k}': None}
         for file_path, loss_key in zip(loss_paths, files.keys()):
@@ -190,7 +203,8 @@ def get_best_model(cfg, path_pre: str, num_models: int = 8) -> Tuple[List[float]
 
     return best_metrics, best_models_inds, data_dict
 
-def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_models: int = 8) -> None: 
+
+def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_models: int = 8, eval: str = "val") -> None:
     """
     Validate a set of models and print their errors.
 
@@ -209,7 +223,12 @@ def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_mo
         cfg = get_config()
         # data updates
         cfg["tgt_step"] = k - 1
-        _, val_dataloader = get_ds(cfg, train_bs=1024)
+        _, val, test = get_ds(cfg, train_bs=1024)
+        if eval == "val":
+            val_dataloader = val
+        elif eval == "test":
+            val_dataloader = test
+
         model = get_model(cfg).to(device)
         # config updates
         cfg['run'] = f"{path_pre}{k}"
@@ -227,12 +246,14 @@ def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_mo
         print(20 * "-")
 
         # validation
-        loss, ground_truth_tensor, predicted_tensor, src_tensor = run_validation(model, device, val_dataloader, None, 0)
+        loss, ground_truth_tensor, predicted_tensor, src_tensor = run_validation(
+            model, device, val_dataloader, None, 0)
         preds_gt["preds"].append(predicted_tensor)
         preds_gt["gt"].append(ground_truth_tensor)
         preds_gt["hist"].append(src_tensor)
-        # get loss 
-        se_loss_val = loss_se(predicted_tensor, ground_truth_tensor.squeeze(-1))
+        # get loss
+        se_loss_val = loss_se(
+            predicted_tensor, ground_truth_tensor.squeeze(-1))
         loss_validation.append(loss)
         loss_cat.append(se_loss_val)
         print(20 * "-")
@@ -242,6 +263,7 @@ def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_mo
         print(f"{ind + 1}\t\t{float(error):.2f}")
 
     return loss_validation, loss_cat, preds_gt
+
 
 def group_data(data, num_models: int = 8):
     seq_data = []
@@ -256,6 +278,7 @@ def group_data(data, num_models: int = 8):
 
     return seq_data
 
+
 def plot_results(seq_datapoint: dict, num_models: int, history_len: int) -> plt.figure:
     d0 = [i for i in range(history_len)]
     d = [i for i in range(history_len, history_len+num_models)]
@@ -264,15 +287,19 @@ def plot_results(seq_datapoint: dict, num_models: int, history_len: int) -> plt.
     ax.plot(d0, seq_datapoint['hist'], label="History", color='g')
 
     if num_models == 1:
-        ax.plot(d, seq_datapoint['true'], label="Ground Truth", marker='o', color='b')
-        ax.plot(d, seq_datapoint['pred'], label="Predicted", marker='o', color='r')
+        ax.plot(d, seq_datapoint['true'],
+                label="Ground Truth", marker='o', color='b')
+        ax.plot(d, seq_datapoint['pred'],
+                label="Predicted", marker='o', color='r')
     else:
         ax.plot(d, seq_datapoint['true'], label="Ground Truth", color='b')
         ax.plot(d, seq_datapoint['pred'], label="Predicted", color='r')
 
     # Add loss
-    rmse_loss = mean_squared_error(seq_datapoint['true'], seq_datapoint['pred'], squared=False)
-    mae_loss = mean_absolute_error(seq_datapoint['true'], seq_datapoint['pred'])
+    rmse_loss = mean_squared_error(
+        seq_datapoint['true'], seq_datapoint['pred'], squared=False)
+    mae_loss = mean_absolute_error(
+        seq_datapoint['true'], seq_datapoint['pred'])
 
     plt.figtext(0.14, 0.93, f'RMSE: {rmse_loss:.2f}', fontsize=12, ha='left')
     plt.figtext(0.14, 0.89, f'MAE: {mae_loss:.2f}', fontsize=12, ha='left')
@@ -288,6 +315,7 @@ def plot_results(seq_datapoint: dict, num_models: int, history_len: int) -> plt.
     # Return the figure
     return fig
 
+
 def plot_k_results(seq_data: list, inds: list) -> None:
     getter = itemgetter(*inds)
     seq_slice = list(getter(seq_data))
@@ -296,9 +324,10 @@ def plot_k_results(seq_data: list, inds: list) -> None:
 
         num_models = len(dp['pred'])
         history_len = len(dp['hist'])
-        
+
         plot_results(dp, num_models, history_len)
         plt.show()
+
 
 def compute_val_errors(preds_gt: dict, num_models: int):
     print("Model\tRMSE\tMAE\tR2")
@@ -311,11 +340,13 @@ def compute_val_errors(preds_gt: dict, num_models: int):
             "r2": r2_score(preds_gt['gt'][k].squeeze(-1).cpu(), preds_gt['preds'][k].cpu()),
             "rmse": mean_squared_error(preds_gt['gt'][k].squeeze(-1).cpu(), preds_gt['preds'][k].cpu(), squared=False),
             "mae": mean_absolute_error(preds_gt['gt'][k].squeeze(-1).cpu(), preds_gt['preds'][k].cpu()),
-            }
+        }
 
-        print(f'{k+1}\t{result_dict[f"model_{k+1}"]["rmse"]:.2f}\t{result_dict[f"model_{k+1}"]["mae"]:.2f}\t{result_dict[f"model_{k+1}"]["r2"]:.2f}')
+        print(
+            f'{k+1}\t{result_dict[f"model_{k+1}"]["rmse"]:.2f}\t{result_dict[f"model_{k+1}"]["mae"]:.2f}\t{result_dict[f"model_{k+1}"]["r2"]:.2f}')
 
     return result_dict
+
 
 def plot_loss_curve(prefix: str, ax: Union[plt.axes, None] = None, row_height: float = 3):
     with open(f'{prefix}training_loss.txt', 'r') as train_file, open(f'{prefix}val_loss.txt', 'r') as val_file:
@@ -328,7 +359,7 @@ def plot_loss_curve(prefix: str, ax: Union[plt.axes, None] = None, row_height: f
     assert len(training_loss) == len(validation_loss)
 
     d = [i for i in range(len(training_loss))]
-    
+
     if not ax:
         _, ax = plt.subplots(figsize=(10, row_height))
 
@@ -342,11 +373,12 @@ def plot_loss_curve(prefix: str, ax: Union[plt.axes, None] = None, row_height: f
 
     return ax
 
+
 def arrange_figures_in_rows(n_rows: int, prefix: str, row_height: float = 3):
     fig, axs = plt.subplots(n_rows, 1, figsize=(10, row_height * n_rows))
     for i in range(n_rows):
         gen_path = f'./loss/run{prefix}{i+1}/'
         axs[i] = plot_loss_curve(gen_path, axs[i])
-    
+
     fig.tight_layout()
     plt.show()
