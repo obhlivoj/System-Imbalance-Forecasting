@@ -39,7 +39,7 @@ def get_config():
         "model_basename": "tmodel_",
         "preload": None,
         "experiment_name": "runs/tmodel",
-        "run": "no_forward",
+        "run": "forward",
     }
 
 
