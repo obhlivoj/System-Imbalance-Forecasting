@@ -83,14 +83,14 @@ def get_ds(config, train_bs=None, return_raw=False):
 
     # train-val split
     data_train = ds_lags[lambda x: x.datetime_utc <=
-                         config["train_split"]].copy()
+                         pd.Timestamp(config["train_split"])].copy()
     data_train = data_train.fillna(data_train.median(numeric_only=True))
 
-    data_val = ds_lags[lambda x: (config["train_split"] < x.datetime_utc) & (
-        x.datetime_utc <= config["test_split"])].copy()
+    data_val = ds_lags[lambda x: (pd.Timestamp(config["train_split"]) < x.datetime_utc) & (
+        x.datetime_utc <= pd.Timestamp(config["test_split"]))].copy()
     data_val = data_val.fillna(data_train.median(numeric_only=True))
 
-    data_test = ds_lags[lambda x: x.datetime_utc > config["test_split"]].copy()
+    data_test = ds_lags[lambda x: x.datetime_utc > pd.Timestamp(config["test_split"])].copy()
     data_test = data_val.fillna(data_train.median(numeric_only=True))
 
     train_data_raw, train_data_tensor = prepare_time_series_data(
