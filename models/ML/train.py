@@ -91,7 +91,7 @@ def get_ds(config, train_bs=None, return_raw=False):
     data_val = data_val.fillna(data_train.median(numeric_only=True))
 
     data_test = ds_lags[lambda x: x.datetime_utc > config["test_split"]].copy()
-    data_test = data_val.fillna(data_train.median(numeric_only=True))
+    data_test = data_test.fillna(data_train.median(numeric_only=True))
 
     train_data_raw, train_data_tensor = prepare_time_series_data(
         data_train, config)
