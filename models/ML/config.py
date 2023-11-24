@@ -1,6 +1,4 @@
 from pathlib import Path
-import pandas as pd
-
 
 def get_config():
     return {
@@ -26,8 +24,8 @@ def get_config():
         },
         "diffs": None,
         "forward_lags": True,
-        "train_split": pd.Timestamp('2023-03-01 00:00:00'),
-        "test_split": pd.Timestamp('2023-06-01 00:00:00'),
+        "train_split": '2023-03-01 00:00:00',
+        "test_split": '2023-06-01 00:00:00',
         "batch_size": 64,
         "num_epochs": 50,
         "lr": 10**-3,
