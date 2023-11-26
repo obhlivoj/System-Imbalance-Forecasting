@@ -38,7 +38,6 @@ class TSDataset(Dataset):
         label = datapoint['y_true']
         x_orig = datapoint["target_history"]
 
-        assert enc_input.size(0) == self.src_seq_len
         assert label.size(0) == self.tgt_seq_len
 
         return {

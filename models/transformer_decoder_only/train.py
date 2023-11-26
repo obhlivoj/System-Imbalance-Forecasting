@@ -15,6 +15,10 @@ import pandas as pd
 from tqdm import tqdm
 import pickle
 
+import numpy as np
+import itertools
+from sklearn.model_selection import TimeSeriesSplit
+
 from torch.utils.tensorboard import SummaryWriter
 
 def write_loss(run: int, train_loss: float, val_loss: float):
@@ -30,7 +34,7 @@ def write_loss(run: int, train_loss: float, val_loss: float):
         with open(path, 'a') as file:
             file.write(str(f'{loss:.2f}')+"\n")
 
-def run_validation(model, device, validation_dataloader, writer, epoch):
+def run_validation(model, device, validation_dataloader):
     model.eval()
 
     src_input = []
@@ -50,7 +54,6 @@ def run_validation(model, device, validation_dataloader, writer, epoch):
             ground_truth.append(label)
             predicted.append(model_out)
             
-
         gt_torch = torch.cat(ground_truth)
         pred_torch = torch.cat(predicted)
         src_torch = torch.cat(src_input)
@@ -58,14 +61,10 @@ def run_validation(model, device, validation_dataloader, writer, epoch):
         loss_fn = nn.MSELoss()
         loss = loss_fn(pred_torch.view(-1), gt_torch.view(-1))
 
-    if writer:
-        writer.add_scalar('val loss', loss.item(), epoch)
-        writer.flush()
-
     return float(loss), gt_torch, pred_torch, src_torch
 
 
-def get_ds(config, train_bs = None):
+def get_ds(config, train_bs = None, return_raw=False):
     with open(os.path.join(config["path_pickle"], config["data_pickle_name"]), 'rb') as file:
         ds_raw =  pickle.load(file)
     ds_lags, new_vars = create_lags(ds_raw, config["lags"], config["diffs"])
@@ -74,38 +73,51 @@ def get_ds(config, train_bs = None):
     config["exo_vars"] += new_vars
     
     # train-val split
-    training_split = pd.Timestamp('2023-04-01 00:00:00')
-    data_train = ds_lags[lambda x: x.datetime_utc <= training_split].copy()
+    data_train = ds_lags[lambda x: x.datetime_utc <=
+                         pd.Timestamp(config["train_split"])].copy()
     data_train = data_train.fillna(data_train.median(numeric_only=True))
 
-    data_val = ds_lags[lambda x: x.datetime_utc > training_split].copy()
+    data_val = ds_lags[lambda x: (pd.Timestamp(config["train_split"]) < x.datetime_utc) & (
+        x.datetime_utc <= pd.Timestamp(config["test_split"]))].copy()
     data_val = data_val.fillna(data_train.median(numeric_only=True))
+
+    data_test = ds_lags[lambda x: x.datetime_utc > pd.Timestamp(config["test_split"])].copy()
+    data_test = data_test.fillna(data_train.median(numeric_only=True))
 
     train_data_raw, train_data_tensor, train_label_tensor = prepare_time_series_data(data_train, config["exo_vars"], config["target"], config['tgt_step'], config['src_seq_len'], config['tgt_seq_len'])
     val_data_raw, _, _ = prepare_time_series_data(data_val, config["exo_vars"], config["target"], config['tgt_step'], config['src_seq_len'], config['tgt_seq_len'])
+    test_data_raw, _, _ = prepare_time_series_data(data_test, config["exo_vars"], config["target"], config['tgt_step'], config['src_seq_len'], config['tgt_seq_len'])
 
     data_to_scale = {
         "train": train_data_raw,
         "val": val_data_raw,
+        "test": test_data_raw,
     }
     
     data_scaled = scale_data_seq(train_data_tensor, train_label_tensor, data_to_scale)
-    train_scl, val_scl = data_scaled
+    train_scl, val_scl, test_scl = data_scaled
+
+    if return_raw:
+        return train_scl, val_scl, test_scl
 
     train_ds = TSDataset(train_scl, config['src_seq_len'], config['tgt_seq_len'])
     val_ds = TSDataset(val_scl, config['src_seq_len'], config['tgt_seq_len'])
+    test_ds = TSDataset(test_scl, config['src_seq_len'], config['tgt_seq_len'])
     
     if train_bs:
         train_dataloader = DataLoader(train_ds, batch_size=train_bs, shuffle=True)
     else:   
         train_dataloader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True)
     val_dataloader = DataLoader(val_ds, batch_size=config['batch_size']*10, shuffle=False)
+    test_dataloader = DataLoader(
+        test_ds, batch_size=config['batch_size']*10, shuffle=False)
 
     # return train_dataloader, val_dataloader
-    return train_dataloader, val_dataloader
+    return train_dataloader, val_dataloader, test_dataloader
 
 def get_model(cfg):
-    model = TransformerDecoderOnly(len(cfg["exo_vars"] + cfg["target"]), cfg["src_seq_len"], cfg["tgt_seq_len"], n_head = 2, Nx = 4, d_ff = cfg['d_ff'], dropout = 0.1)
+    model = TransformerDecoderOnly(len(cfg["exo_vars"] + cfg["target"]), cfg["src_seq_len"], cfg["tgt_seq_len"],
+                                    n_head = cfg['n_head'], Nx = cfg['Nx'], d_ff = cfg['d_ff'], d_d = cfg['d_d'], dropout = cfg['dropout'])
     return model
 
 def train_model(cfg):
@@ -116,7 +128,7 @@ def train_model(cfg):
     # Make sure the weights folder exists
     Path(cfg['model_folder']).mkdir(parents=True, exist_ok=True)
 
-    train_dataloader, val_dataloader = get_ds(cfg)
+    train_dataloader, val_dataloader, _ = get_ds(cfg)
     model = get_model(cfg).to(device)
 
     # Tensorboard
@@ -173,7 +185,7 @@ def train_model(cfg):
         txt_msg = f"Training loss of epoch {epoch}: {epoch_loss/len(train_dataloader)}"
         batch_iterator.write(txt_msg)
 
-        val_loss, _, _, _ = run_validation(model, device, val_dataloader, writer, epoch)
+        val_loss, _, _, _ = run_validation(model, device, val_dataloader)
         txt_msg = f"Validation loss of epoch {epoch}: {val_loss}"
         batch_iterator.write(txt_msg)
 
@@ -189,6 +201,124 @@ def train_model(cfg):
         }, model_filename)
 
     return model
+
+def training_loop(cfg, device, train_dataloader, val_dataloader):
+    score = []
+
+    model = get_model(cfg).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg['lr'], eps=1e-9)
+    loss_fn = nn.MSELoss().to(device)
+
+    for _ in range(cfg['num_epochs']):
+        epoch_loss = 0
+        model.train()
+        for batch in train_dataloader:
+            encoder_input = batch['encoder_input'].to(device)
+            output = model(encoder_input, device)
+            label = batch['label'].to(device)
+
+            # Compute the loss using MSE
+            loss = loss_fn(output.view(-1), label.view(-1))
+            epoch_loss += loss.item()
+
+            # Backpropagate the loss, update the weights
+            loss.backward()
+
+            optimizer.step()
+            optimizer.zero_grad(set_to_none=True)
+
+        val_loss = loop_validation(model, device, val_dataloader)
+        score.append(val_loss)
+
+    return score
+
+def loop_validation(model, device, validation_dataloader):
+    model.eval()
+
+    ground_truth = []
+    predicted = []
+
+    with torch.no_grad():
+        for batch in validation_dataloader:
+            encoder_input = batch['encoder_input'].to(device)
+            model_out = model(encoder_input, device)
+            predicted.append(model_out)
+
+            label = batch["label"].to(device)
+            ground_truth.append(label)
+
+        gt_torch = torch.cat(ground_truth)
+        pred_torch = torch.cat(predicted)
+
+        loss_fn = nn.MSELoss()
+        loss = loss_fn(pred_torch.view(-1), gt_torch.view(-1))
+
+    return float(loss)
+
+
+def grid_search(config, device, lr_cv: float, n_epoch: int, param_grid: dict, n_iter: int = 20, n_split: int = 4, cv_dic: int = 5):
+    config["num_epochs"] = n_epoch
+    config['lr'] = lr_cv
+    train_scl, _, _ = get_ds(config, return_raw=True)
+
+    tscv = TimeSeriesSplit(
+        n_splits=n_split, test_size=int(len(train_scl)/cv_dic))
+    dataloaders = []
+    for i, (train_ind, test_ind) in enumerate(tscv.split(train_scl)):
+        train_list = [train_scl[k] for k in train_ind]
+        test_list = [train_scl[k] for k in test_ind]
+
+        train_ds = TSDataset(
+            train_list, config['src_seq_len'], config['tgt_seq_len'])
+        val_ds = TSDataset(
+            test_list, config['src_seq_len'], config['tgt_seq_len'])
+
+        train_dataloader = DataLoader(
+            train_ds, batch_size=config['batch_size'], shuffle=True)
+        val_dataloader = DataLoader(
+            val_ds, batch_size=config['batch_size']*10, shuffle=False)
+
+        dataloaders.append({"train": train_dataloader, "test": val_dataloader})
+
+    hyperparameter_combinations = list(itertools.product(*param_grid.values()))
+    np.random.shuffle(hyperparameter_combinations)
+
+    param_combinations = [dict(zip(param_grid.keys(), values))
+                          for values in hyperparameter_combinations]
+
+    # prepare list to store results, calculate avg score per iter and select the best params
+    final_scores = {"avg_score": [], "score_list": [],
+                    "params": [], "full_score": []}
+
+    # Number of iterations for random search
+    for i in tqdm(range(min(n_iter, len(param_combinations)))):
+        selected_hyperparameters = param_combinations[i]
+        info = "hyperparams: "
+        for k, v in selected_hyperparameters.items():
+            config[k] = v
+            info += f"{k}: {v}, "
+
+        print(info)
+        losses = []
+        full_score_list = []
+        for i, data in enumerate(dataloaders):
+            score = training_loop(config, device, data['train'], data['test'])
+            full_score_list.append(score)
+            losses.append(np.min(score))
+
+        final_scores['full_score'].append(full_score_list)
+        final_scores['avg_score'].append(np.mean(losses))
+        final_scores['score_list'].append(losses)
+        final_scores['params'].append(selected_hyperparameters)
+
+        print(
+            f"Scores: {', '.join([f'{x:.2f}' for x in losses])}; avg score: {np.mean(losses):.2f}")
+        print(20*"-")
+
+        best_ind = np.argmin(final_scores['avg_score'])
+        best_params, best_score = final_scores['params'][best_ind], final_scores['avg_score'][best_ind]
+
+    return final_scores, best_params, best_score
 
 if __name__ == '__main__':
     warnings.filterwarnings("ignore")
