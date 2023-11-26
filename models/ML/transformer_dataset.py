@@ -31,7 +31,7 @@ class TSDataset(Dataset):
 
     def __len__(self) -> int:
         return len(self.ds)
-    
+
     def __getitem__(self, index: int) -> dict:
         datapoint = self.ds[index]
         enc_input = datapoint['x_input']
@@ -42,25 +42,27 @@ class TSDataset(Dataset):
 
         return {
             "encoder_input": enc_input,  # (src_seq_len, n_features)
-            "label": label, # (tgt_seq_len, n_tgt)
-            "x_orig": x_orig # (src_seq_len, n_features)
+            "label": label,  # (tgt_seq_len, n_tgt)
+            "x_orig": x_orig  # (src_seq_len, n_features)
         }
-    
+
     def collate_fn(self, batch: List[dict]) -> dict:
         # Handle None values for encoder_mask
         encoder_mask = [item["encoder_mask"] for item in batch]
-        encoder_mask = torch.stack(encoder_mask) if None not in encoder_mask else None
-        
+        encoder_mask = torch.stack(
+            encoder_mask) if None not in encoder_mask else None
+
         # Stack other tensors
         other_tensors = {
             key: torch.stack([item[key] for item in batch]) for key in batch[0].keys() if key != "encoder_mask"
         }
-        
+
         return {
             "encoder_input": other_tensors["encoder_input"],
             "label": other_tensors["label"],
             "x_orig": other_tensors["x_orig"]
         }
+
 
 def prepare_time_series_data(data: pd.DataFrame, cfg) -> Tuple[List[dict], torch.Tensor, torch.Tensor]:
     """
@@ -91,7 +93,8 @@ def prepare_time_series_data(data: pd.DataFrame, cfg) -> Tuple[List[dict], torch
     data_seq = []
 
     num_obs = len(data_tensor)
-    max_start_idx = num_obs - cfg['src_seq_len'] - cfg['tgt_seq_len'] - cfg['tgt_step'] + 1
+    max_start_idx = num_obs - cfg['src_seq_len'] - \
+        cfg['tgt_seq_len'] - cfg['tgt_step'] + 1
 
     for start_idx in range(max_start_idx):
         end_idx = start_idx + cfg['src_seq_len']
@@ -100,17 +103,18 @@ def prepare_time_series_data(data: pd.DataFrame, cfg) -> Tuple[List[dict], torch
         x_input_seq = data_tensor[start_idx:end_idx]
         x_forward_lag = data_fl_tensor[end_idx:end_label_idx]
         label_input_seq = label_tensor[start_idx:end_idx]
-        
+
         ground_truth = label_tensor[end_idx + cfg['tgt_step']:end_label_idx]
 
         data_seq.append({
-        "x_input_raw" : x_input_seq,
-        "x_forward_lag" : x_forward_lag,
-        "y_true" : ground_truth,
-        "target_history" : label_input_seq,
+            "x_input_raw": x_input_seq,
+            "x_forward_lag": x_forward_lag,
+            "y_true": ground_truth,
+            "target_history": label_input_seq,
         })
 
     return data_seq, data_tensor
+
 
 def scale_data_seq(cfg, data_tensor: torch.Tensor, data_to_scale: Dict[str, List[dict]]) -> Tuple[List[dict], List[dict], List[dict], StandardScaler]:
     """
@@ -128,19 +132,24 @@ def scale_data_seq(cfg, data_tensor: torch.Tensor, data_to_scale: Dict[str, List
     - test_data (list): Scaled test data sequences.
     """
     scaled_data = deepcopy(data_to_scale)
-    
+
     enc_scaler = StandardScaler()
     enc_scaler.fit(data_tensor)
 
     for name, dt in data_to_scale.items():
         for ind, obs in enumerate(dt):
-            x_in = torch.tensor(enc_scaler.transform(obs['x_input_raw']), dtype=torch.float32)
-            x_fl = torch.tensor(enc_scaler.transform(obs['x_forward_lag']), dtype=torch.float32)
-            scaled_data[name][ind]['x_input'] = torch.concat((x_in.flatten(), x_fl[:,len(cfg['target']):].flatten()))
+            x_in = torch.tensor(enc_scaler.transform(
+                obs['x_input_raw']), dtype=torch.float32)
+            x_fl = torch.tensor(enc_scaler.transform(
+                obs['x_forward_lag']), dtype=torch.float32)
+            scaled_data[name][ind]['x_input'] = torch.concat(
+                (x_in.flatten(), x_fl[:, len(cfg['target']):].flatten()))
 
     return [scaled_data[name] for name in data_to_scale.keys()]
 
 # create lags and lagged diffs
+
+
 def create_lags(df: pd.DataFrame, lags_dict: Union[None, Dict[str, List[int]]] = None, lagged_difs: Union[None, Dict[str, List[int]]] = None) -> Tuple[pd.DataFrame, List[str]]:
     """
     Create lagged variables and lagged differences for specified variables.
@@ -169,6 +178,7 @@ def create_lags(df: pd.DataFrame, lags_dict: Union[None, Dict[str, List[int]]] =
             for num_lag in lag_values:
                 new_column_name = f"{variable_name}_lag_diff{num_lag}"
                 new_vars.append(new_column_name)
-                data[new_column_name] = data[variable_name].diff(1).shift(num_lag-1)
+                data[new_column_name] = data[variable_name].diff(
+                    1).shift(num_lag-1)
 
     return data.dropna(subset=new_vars), new_vars
