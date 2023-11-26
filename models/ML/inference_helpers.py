@@ -11,6 +11,7 @@ from train import get_model
 from typing import List, Tuple, Dict, Union
 
 from operator import itemgetter
+import json
 
 
 def loss_se(predicted: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
@@ -221,8 +222,12 @@ def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_mo
     preds_gt = {"preds": [], "gt": [], "hist": []}
     for k in range(1, num_models + 1):
         cfg = get_config()
+        with open(f'{path_pre}{k}.json', 'r') as file:
+            json_info = json.load(file)
         # data updates
         cfg["tgt_step"] = k - 1
+        cfg['hidden_dim'] = json_info['hidden_dim']
+        
         train, val, test = get_ds(cfg, train_bs=1024)
         if eval_data == "train":
             val_dataloader = train
