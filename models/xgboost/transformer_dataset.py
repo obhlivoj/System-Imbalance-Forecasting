@@ -102,17 +102,21 @@ def prepare_time_series_data(data: pd.DataFrame, cfg) -> Tuple[List[dict], torch
         end_label_idx = end_idx + cfg['tgt_seq_len'] + cfg['tgt_step']
 
         x_input_seq = data_tensor[start_idx:end_idx]
-        x_forward_lag = data_fl_tensor[end_idx:end_label_idx]
+        if cfg['forward_lags']:
+            x_forward_lag = data_fl_tensor[end_idx:end_label_idx]
         label_input_seq = label_tensor[start_idx:end_idx]
 
         ground_truth = label_tensor[end_idx + cfg['tgt_step']:end_label_idx]
 
-        data_seq.append({
+        to_append = {
             "x_input_raw": x_input_seq,
-            "x_forward_lag": x_forward_lag,
             "y_true": ground_truth,
             "target_history": label_input_seq,
-        })
+        }
+        if cfg['forward_lags']:
+            to_append["x_forward_lag"] = x_forward_lag
+
+        data_seq.append(to_append)
 
     return data_seq, data_tensor
 
@@ -141,10 +145,13 @@ def scale_data_seq(cfg, data_tensor: torch.Tensor, data_to_scale: Dict[str, List
         for ind, obs in enumerate(dt):
             x_in = torch.tensor(enc_scaler.transform(
                 obs['x_input_raw']), dtype=torch.float32)
-            x_fl = torch.tensor(enc_scaler.transform(
-                obs['x_forward_lag']), dtype=torch.float32)
-            scaled_data[name][ind]['x_input'] = torch.concat(
-                (x_in.flatten(), x_fl[:, len(cfg['target']):].flatten()))
+            if cfg['forward_lags']:
+                x_fl = torch.tensor(enc_scaler.transform(
+                    obs['x_forward_lag']), dtype=torch.float32)
+                scaled_data[name][ind]['x_input'] = torch.concat(
+                    (x_in.flatten(), x_fl[:, len(cfg['target']):].flatten()))
+            else:
+                scaled_data[name][ind]['x_input'] = x_in.flatten()
 
     return [scaled_data[name] for name in data_to_scale.keys()]
 

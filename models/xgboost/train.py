@@ -100,6 +100,9 @@ def get_model(cfg, device):
         'max_depth': cfg["max_depth"],
         'learning_rate': cfg["lr"],
         'n_estimators': cfg["n_estimators"],
+        'reg_alpha': cfg['reg_alpha'],
+        'reg_lambda': cfg['reg_lambda'],
+        'subsample': cfg['subsample'],
         'early_stopping_rounds': cfg['early_stopping_rounds'],
         'eval_metric': ["mae", "rmse"]
     }
@@ -154,7 +157,7 @@ def grid_search(cfg, device, lr_cv: float, n_cv: int, param_grid: dict, n_iter: 
                                      scoring='neg_mean_squared_error',
                                      param_distributions=param_grid,
                                      n_iter=n_iter, error_score='raise',
-                                     verbose=0)
+                                     verbose=10)
     grid_search.fit(x_train, y_train)
 
     return grid_search

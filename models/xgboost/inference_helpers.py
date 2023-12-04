@@ -11,6 +11,7 @@ from train import get_model
 from typing import List, Tuple, Dict, Union
 
 from operator import itemgetter
+import json
 
 
 def loss_se(predicted: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
@@ -190,7 +191,7 @@ def get_best_model(cfg, path_pre: str, num_models: int = 8) -> Tuple[List[float]
 
     return best_metrics, best_models_inds, data_dict
 
-def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_models: int = 8) -> None: 
+def validate_n_models(device, path_pre: str, params: Tuple[str], num_models: int = 8, eval_data: str = "val") -> None: 
     """
     Validate a set of models and print their errors.
 
@@ -208,36 +209,47 @@ def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_mo
     for k in range(1, num_models + 1):
         cfg = get_config()
         # data updates
+        with open(f'{path_pre}{k}.json', 'r') as file:
+            json_info = json.load(file)
         cfg["tgt_step"] = k - 1
+        for param_name in params:
+            cfg[param_name] = json_info[param_name]
         model = get_model(cfg, device)
+
         # config updates
         cfg['run'] = f"{path_pre}{k}"
         cfg['model_folder'] += cfg['run']
 
         # Load the pretrained weights
-        ind = best_models_inds[k - 1]
         model.load_model(f"{cfg['model_folder']}/xgb_model_{k}.json")
+
+        train, val, test = get_ds(cfg)
+        if eval_data == "train":
+            val_data = train
+        elif eval_data == "val":
+            val_data = val
+        elif eval_data == "test":
+            val_data = test
 
         print(f"MODEL EVAL - #{k}")
         print(20 * "-")
 
         # validation
-        _, _, x_test, y_test, _,  hist_test = get_ds(cfg)   
-        predictions = model.predict(x_test)     
+        x_val, y_val, hist_val = val_data
+        predictions = model.predict(x_val)     
         preds_gt["preds"].append(predictions)
-        preds_gt["gt"].append(y_test)
-        preds_gt["hist"].append(hist_test)
+        preds_gt["gt"].append(y_val)
+        preds_gt["hist"].append(hist_val)
         # get loss 
-        se_loss_val = mean_squared_error(y_test, predictions)
-        loss_validation.append(model.best_score)
-        loss_cat.append(se_loss_val)
+        se_loss_val = mean_squared_error(y_val, predictions)
+        loss_validation.append(se_loss_val)
         print(20 * "-")
 
     print("Time-step\tError")
     for ind, error in enumerate(loss_validation):
         print(f"{ind + 1}\t\t{float(error):.2f}")
 
-    return loss_validation, loss_cat, preds_gt
+    return loss_validation, preds_gt
 
 def group_data(data, num_models: int = 8):
     seq_data = []
