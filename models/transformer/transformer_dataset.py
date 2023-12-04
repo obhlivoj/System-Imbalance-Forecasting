@@ -34,7 +34,7 @@ class TSDataset(Dataset):
 
     def __len__(self) -> int:
         return len(self.ds)
-    
+
     def __getitem__(self, index: int) -> dict:
         datapoint = self.ds[index]
         enc_input = datapoint['x_input']
@@ -49,22 +49,25 @@ class TSDataset(Dataset):
         return {
             "encoder_input": enc_input,  # (src_seq_len, n_features)
             "decoder_input": dec_input,  # (tgt_seq_len, n_tgt)
-            "encoder_mask":  torch.ones(1, self.src_seq_len, self.src_seq_len).bool(), # (1, src_seq_len, src_seq_len), cannot be set to None because it is handled poorly by dataloader
-            "decoder_mask": causal_mask(dec_input.size(0)), # (1, tgt_seq_len, tgt_seq_len),
-            "label": label, # (tgt_seq_len, n_tgt)
-            "x_orig": x_orig # (src_seq_len, n_features)
+            # (1, src_seq_len, src_seq_len), cannot be set to None because it is handled poorly by dataloader
+            "encoder_mask":  torch.ones(1, self.src_seq_len, self.src_seq_len).bool(),
+            # (1, tgt_seq_len, tgt_seq_len),
+            "decoder_mask": causal_mask(dec_input.size(0)),
+            "label": label,  # (tgt_seq_len, n_tgt)
+            "x_orig": x_orig  # (src_seq_len, n_features)
         }
-    
+
     def collate_fn(self, batch: List[dict]) -> dict:
         # Handle None values for encoder_mask
         encoder_mask = [item["encoder_mask"] for item in batch]
-        encoder_mask = torch.stack(encoder_mask) if None not in encoder_mask else None
-        
+        encoder_mask = torch.stack(
+            encoder_mask) if None not in encoder_mask else None
+
         # Stack other tensors
         other_tensors = {
             key: torch.stack([item[key] for item in batch]) for key in batch[0].keys() if key != "encoder_mask"
         }
-        
+
         return {
             "encoder_input": other_tensors["encoder_input"],
             "decoder_input": other_tensors["decoder_input"],
@@ -75,6 +78,8 @@ class TSDataset(Dataset):
         }
 
 # returns a triangular mask to protect the decoder to get information from future
+
+
 def causal_mask(size: int) -> torch.Tensor:
     """
     Returns a triangular mask to protect the decoder from getting information from the future.
@@ -87,6 +92,7 @@ def causal_mask(size: int) -> torch.Tensor:
     """
     mask = torch.triu(torch.ones(1, size, size), diagonal=1).type(torch.int)
     return mask == 0
+
 
 def prepare_time_series_data(data: pd.DataFrame, exo_vars: List[str], target: List[str], input_seq_len: int, target_seq_len: int) -> Tuple[List[dict], torch.Tensor, torch.Tensor]:
     """
@@ -119,20 +125,21 @@ def prepare_time_series_data(data: pd.DataFrame, exo_vars: List[str], target: Li
         end_idx = start_idx + input_seq_len
         x_input_seq = data_tensor[start_idx:end_idx]
         label_input_seq = label_tensor[start_idx:end_idx]
-        
+
         target_start_idx = end_idx - 1
         target_end_idx = target_start_idx + target_seq_len
         target_dec_seq = label_tensor[target_start_idx:target_end_idx]
         ground_truth = label_tensor[target_start_idx+1:target_end_idx+1]
 
         data_seq.append({
-        "x_input" : x_input_seq,
-        "target_decoder" : target_dec_seq,
-        "y_true" : ground_truth,
-        "target_history" : label_input_seq,
+            "x_input": x_input_seq,
+            "target_decoder": target_dec_seq,
+            "y_true": ground_truth,
+            "target_history": label_input_seq,
         })
 
     return data_seq, data_tensor, label_tensor
+
 
 def scale_data_seq(data_tensor: torch.Tensor, label_tensor: torch.Tensor, data_to_scale: Dict[str, List[dict]]) -> Tuple[List[dict], List[dict], List[dict], StandardScaler]:
     """
@@ -151,7 +158,7 @@ def scale_data_seq(data_tensor: torch.Tensor, label_tensor: torch.Tensor, data_t
     - dec_scaler: Scaler used for scaling the target decoder.
     """
     scaled_data = deepcopy(data_to_scale)
-    
+
     enc_scaler = StandardScaler()
     dec_scaler = StandardScaler()
 
@@ -160,12 +167,16 @@ def scale_data_seq(data_tensor: torch.Tensor, label_tensor: torch.Tensor, data_t
 
     for name, dt in data_to_scale.items():
         for ind, obs in enumerate(dt):
-            scaled_data[name][ind]['x_input'] = torch.tensor(enc_scaler.transform(obs['x_input']), dtype=torch.float32)
-            scaled_data[name][ind]['target_decoder'] = torch.tensor(dec_scaler.transform(obs['target_decoder']), dtype=torch.float32)
+            scaled_data[name][ind]['x_input'] = torch.tensor(
+                enc_scaler.transform(obs['x_input']), dtype=torch.float32)
+            scaled_data[name][ind]['target_decoder'] = torch.tensor(
+                dec_scaler.transform(obs['target_decoder']), dtype=torch.float32)
 
     return [scaled_data[name] for name in data_to_scale.keys()], dec_scaler
 
 # create lags and lagged diffs
+
+
 def create_lags(df: pd.DataFrame, lags_dict: Union[None, Dict[str, List[int]]] = None, lagged_difs: Union[None, Dict[str, List[int]]] = None) -> Tuple[pd.DataFrame, List[str]]:
     """
     Create lagged variables and lagged differences for specified variables.
@@ -194,6 +205,7 @@ def create_lags(df: pd.DataFrame, lags_dict: Union[None, Dict[str, List[int]]] =
             for num_lag in lag_values:
                 new_column_name = f"{variable_name}_lag_diff{num_lag}"
                 new_vars.append(new_column_name)
-                data[new_column_name] = data[variable_name].diff(1).shift(num_lag-1)
+                data[new_column_name] = data[variable_name].diff(
+                    1).shift(num_lag-1)
 
     return data.dropna(subset=new_vars), new_vars
