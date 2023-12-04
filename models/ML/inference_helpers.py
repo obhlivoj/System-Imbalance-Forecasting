@@ -205,7 +205,7 @@ def get_best_model(cfg, path_pre: str, num_models: int = 8) -> Tuple[List[float]
     return best_metrics, best_models_inds, data_dict
 
 
-def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_models: int = 8, eval_data: str = "val") -> None:
+def validate_n_models(device, path_pre: str, param: List[str], best_models_inds: List[int], num_models: int = 8, eval_data: str = "val") -> None:
     """
     Validate a set of models and print their errors.
 
@@ -226,7 +226,8 @@ def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_mo
             json_info = json.load(file)
         # data updates
         cfg["tgt_step"] = k - 1
-        cfg['hidden_dim'] = json_info['hidden_dim']
+        for param_name in param:
+            cfg[param_name] = json_info[param_name]
         
         train, val, test = get_ds(cfg, train_bs=1024)
         if eval_data == "train":

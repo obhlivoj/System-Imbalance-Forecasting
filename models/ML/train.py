@@ -136,7 +136,7 @@ def get_model(cfg):
             len(cfg["forward_vars"])*(cfg['tgt_step']+cfg["tgt_seq_len"])
     else:
         in_dim = len(cfg["exo_vars"] + cfg["target"])*cfg["src_seq_len"]
-    model = MLP(in_dim, cfg["hidden_dim"], cfg["tgt_seq_len"])
+    model = MLP(in_dim, cfg["hidden_dim"], cfg["tgt_seq_len"], cfg['dropout'])
     return model
 
 

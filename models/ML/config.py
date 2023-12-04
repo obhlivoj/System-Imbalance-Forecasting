@@ -32,6 +32,7 @@ def get_config():
         "src_seq_len": 32,
         "tgt_seq_len": 1,
         "hidden_dim": 512,
+        "dropout": 0.1,
         "tgt_step": 0,
         "model_folder": "weights_folder/weights",
         "model_basename": "tmodel_",

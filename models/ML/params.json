@@ -1,0 +1,50 @@
+{
+    "param_grid": {
+        "hidden_dim": [
+            64,
+            128,
+            256,
+            512,
+            1024
+        ],
+        "dropout": [
+            0.1,
+            0.25,
+            0.5
+        ]
+    },
+    "best_params": [
+        {
+            "hidden_dim": 128,
+            "dropout": 0.5
+        },
+        {
+            "hidden_dim": 512,
+            "dropout": 0.5
+        },
+        {
+            "hidden_dim": 256,
+            "dropout": 0.5
+        },
+        {
+            "hidden_dim": 512,
+            "dropout": 0.5
+        },
+        {
+            "hidden_dim": 256,
+            "dropout": 0.25
+        },
+        {
+            "hidden_dim": 64,
+            "dropout": 0.1
+        },
+        {
+            "hidden_dim": 128,
+            "dropout": 0.1
+        },
+        {
+            "hidden_dim": 128,
+            "dropout": 0.5
+        }
+    ]
+}
