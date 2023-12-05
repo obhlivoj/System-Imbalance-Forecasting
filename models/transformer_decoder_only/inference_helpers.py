@@ -11,6 +11,7 @@ from train import get_model
 from typing import List, Tuple, Dict, Union
 
 from operator import itemgetter
+import json
 
 
 def loss_se(predicted: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
@@ -190,7 +191,7 @@ def get_best_model(cfg, path_pre: str, num_models: int = 8) -> Tuple[List[float]
 
     return best_metrics, best_models_inds, data_dict
 
-def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_models: int = 8) -> None: 
+def validate_n_models(device, path_pre: str, param: List[str], best_models_inds: List[int], num_models: int = 8, eval_data: str = "val") -> None: 
     """
     Validate a set of models and print their errors.
 
@@ -207,9 +208,21 @@ def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_mo
     preds_gt = {"preds": [], "gt": [], "hist": []}
     for k in range(1, num_models + 1):
         cfg = get_config()
+        with open(f'{path_pre}{k}.json', 'r') as file:
+            json_info = json.load(file)
         # data updates
         cfg["tgt_step"] = k - 1
-        _, val_dataloader = get_ds(cfg, train_bs=1024)
+        for param_name in param:
+            cfg[param_name] = json_info[param_name]
+
+        train, val, test = get_ds(cfg, train_bs=1024)
+        if eval_data == "train":
+            val_dataloader = train
+        elif eval_data == "val":
+            val_dataloader = val
+        elif eval_data == "test":
+            val_dataloader = test
+
         model = get_model(cfg).to(device)
         # config updates
         cfg['run'] = f"{path_pre}{k}"
@@ -227,7 +240,7 @@ def validate_n_models(device, path_pre: str, best_models_inds: List[int], num_mo
         print(20 * "-")
 
         # validation
-        loss, ground_truth_tensor, predicted_tensor, src_tensor = run_validation(model, device, val_dataloader, None, 0)
+        loss, ground_truth_tensor, predicted_tensor, src_tensor = run_validation(model, device, val_dataloader)
         preds_gt["preds"].append(predicted_tensor)
         preds_gt["gt"].append(ground_truth_tensor)
         preds_gt["hist"].append(src_tensor)
@@ -308,9 +321,9 @@ def compute_val_errors(preds_gt: dict, num_models: int):
     for k in range(num_models):
         # get score metrics
         result_dict[f'model_{k+1}'] = {
-            "r2": r2_score(preds_gt['gt'][k].squeeze(-1), preds_gt['preds'][k]),
-            "rmse": mean_squared_error(preds_gt['gt'][k].squeeze(-1), preds_gt['preds'][k], squared=False),
-            "mae": mean_absolute_error(preds_gt['gt'][k].squeeze(-1), preds_gt['preds'][k]),
+            "r2": r2_score(preds_gt['gt'][k].squeeze(-1).cpu(), preds_gt['preds'][k].cpu()),
+            "rmse": mean_squared_error(preds_gt['gt'][k].squeeze(-1).cpu(), preds_gt['preds'][k].cpu(), squared=False),
+            "mae": mean_absolute_error(preds_gt['gt'][k].squeeze(-1).cpu(), preds_gt['preds'][k].cpu()),
             }
 
         print(f'{k+1}\t{result_dict[f"model_{k+1}"]["rmse"]:.2f}\t{result_dict[f"model_{k+1}"]["mae"]:.2f}\t{result_dict[f"model_{k+1}"]["r2"]:.2f}')

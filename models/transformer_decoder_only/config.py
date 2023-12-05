@@ -20,6 +20,7 @@ def get_config():
         ],
         "target": ["system_imbalance"],
         "lags": {
+            #"system_imbalance": [i for i in range(4*24-2*4, 4*24+6*4)] + [i for i in range(7*4*24-2*4, 7*4*24+6*4)]
             "system_imbalance": [4*24-2*4, 7*4*24-2*4]
         },  
         "diffs": None,
