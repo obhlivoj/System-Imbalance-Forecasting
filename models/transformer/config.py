@@ -21,15 +21,15 @@ def get_config():
         ],
         "target": ["system_imbalance"],
         "lags": {
-            "system_imbalance": [i for i in range(4*24-2*4, 4*24+6*4)] + [i for i in range(7*4*24-2*4, 7*4*24+6*4)]
-            # "system_imbalance": [4*24-2*4, 7*4*24-2*4]
+            #"system_imbalance": [i for i in range(4*24-2*4, 4*24+6*4)] + [i for i in range(7*4*24-2*4, 7*4*24+6*4)]
+            "system_imbalance": [4*24-2*4, 7*4*24-2*4]
         },
         "diffs": None,
         "forward_lags": True,
         "train_split": '2023-03-01 00:00:00',
         "test_split": '2023-06-01 00:00:00',
         "batch_size": 64,
-        "num_epochs": 15,
+        "num_epochs": 40,
         "lr": 1*10**-4,
         "src_seq_len": 32,
         "tgt_seq_len": 8,
