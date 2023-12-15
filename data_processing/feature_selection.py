@@ -14,6 +14,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+
 def keep_columns(df: pd.DataFrame, cols_to_keep: List[str]) -> pd.DataFrame:
     """
     Keep specified columns in a Pandas DataFrame and drop the rest.
@@ -32,6 +33,7 @@ def keep_columns(df: pd.DataFrame, cols_to_keep: List[str]) -> pd.DataFrame:
     df = df.drop(columns_to_drop, axis=1)
 
     return df
+
 
 def transform_columns_wider(data: pd.DataFrame, cols: List[str], vars: List[str], contr: List[int]) -> pd.DataFrame:
     """
@@ -73,7 +75,8 @@ def transform_columns_wider(data: pd.DataFrame, cols: List[str], vars: List[str]
         df = df.rename(columns=lambda x: x + f"_{suffix}" if x in cols else x)
         new_data_list.append(df)
 
-    df_final = reduce(lambda left, right: pd.merge(left, right, on='datetime', how='left'), new_data_list)
+    df_final = reduce(lambda left, right: pd.merge(
+        left, right, on='datetime', how='left'), new_data_list)
 
     return df_final
 
@@ -108,7 +111,7 @@ def transform_columns_sum(data: pd.DataFrame, cols: List[str], vars: List[str]) 
         if df.shape[0] == 0:
             data_final_list.pop(f_idx)
             combs.pop(f_idx)
-    
+
     new_data_list = []
     datetime_col = data_final_list[0]["datetime"].reset_index(drop=True)
     for df in data_final_list:
@@ -119,7 +122,6 @@ def transform_columns_sum(data: pd.DataFrame, cols: List[str], vars: List[str]) 
     df_final['datetime'] = datetime_col
 
     return df_final
-
 
 
 def additional_features(data: pd.DataFrame, datetime_col: str) -> None:
@@ -134,7 +136,8 @@ def additional_features(data: pd.DataFrame, datetime_col: str) -> None:
     """
     data["year"] = data[datetime_col].dt.year
     data["month"] = data[datetime_col].dt.month
-    data["day"] = data[datetime_col].dt.day
+    data["day"] = data[datetime_col].dt.dayofyear
+    data["weekday"] = data[datetime_col].dt.dayofweek
     data["hour"] = data[datetime_col].dt.hour
     data['quarter_hour'] = data[datetime_col].dt.minute // 15
     data["index"] = list(range(data.shape[0]))
@@ -146,16 +149,21 @@ def additional_features(data: pd.DataFrame, datetime_col: str) -> None:
     data['month_cos'] = np.cos(2 * np.pi * data['month'] / 12)
     data['day_sin'] = np.sin(2 * np.pi * data['day'] / 365)
     data['day_cos'] = np.cos(2 * np.pi * data['day'] / 365)
+    data['weekday_sin'] = np.sin(2 * np.pi * data['day'] / 7)
+    data['weekday_cos'] = np.cos(2 * np.pi * data['day'] / 7)
     data['hour_sin'] = np.sin(2 * np.pi * data['hour'] / 24)
     data['hour_cos'] = np.cos(2 * np.pi * data['hour'] / 24)
     data['quarter_hour_sin'] = np.sin(2 * np.pi * data['quarter_hour'] / 4)
     data['quarter_hour_cos'] = np.cos(2 * np.pi * data['quarter_hour'] / 4)
 
-    data["year"] = data["year"].astype(str).astype("category")  # categories have to be strings
+    data["year"] = data["year"].astype(str).astype(
+        "category")  # categories have to be strings
     data["month"] = data["month"].astype(str).astype("category")
     data["day"] = data["day"].astype(str).astype("category")
+    data["weekday"] = data["weekday"].astype(str).astype("category")
     data["hour"] = data["hour"].astype(str).astype("category")
     data['quarter_hour'] = data['quarter_hour'].astype(str).astype("category")
+
 
 def plot_corrmat(corr: pd.DataFrame) -> None:
     """
