@@ -81,7 +81,11 @@ def transform_columns_wider(data: pd.DataFrame, cols: List[str], vars: List[str]
     return df_final
 
 
-def transform_columns_sum(data: pd.DataFrame, cols: List[str], vars: List[str]) -> pd.DataFrame:
+def contains_numeric(row):
+    return any(isinstance(x, (int, float)) and not pd.isna(x) for x in row)
+
+
+def transform_columns_sum(data: pd.DataFrame, cols: List[str], vars_list: List[str]) -> pd.DataFrame:
     """
     Sums the values in columns based on unique combinations of variables.
 
@@ -94,12 +98,12 @@ def transform_columns_sum(data: pd.DataFrame, cols: List[str], vars: List[str]) 
     Returns:
         pd.DataFrame: The DataFrame with summed values.
     """
-    un_count = [data[v].unique() for v in vars]
+    un_count = [data[v].unique() for v in vars_list]
     cartesian_product = list(itertools.product(*un_count))
 
     data_final_list = []
     for item in cartesian_product:
-        conds = [data[v] == it for it, v in zip(item, vars)]
+        conds = [data[v] == it for it, v in zip(item, vars_list)]
         combined_conditions = reduce(lambda a, b: a & b, conds)
 
         data_final_list.append(data[combined_conditions])
@@ -115,8 +119,10 @@ def transform_columns_sum(data: pd.DataFrame, cols: List[str], vars: List[str]) 
     new_data_list = []
     datetime_col = data_final_list[0]["datetime"].reset_index(drop=True)
     for df in data_final_list:
-        df = df.drop(vars, axis=1)
-        new_data_list.append(df[cols].reset_index(drop=True))
+        df = df.drop(vars_list, axis=1)
+        df_processed = df[cols].apply(
+            lambda row: row if contains_numeric(row) else row.fillna(0), axis=1)
+        new_data_list.append(df_processed.reset_index(drop=True))
 
     df_final = reduce(lambda left, right: left + right, new_data_list)
     df_final['datetime'] = datetime_col
