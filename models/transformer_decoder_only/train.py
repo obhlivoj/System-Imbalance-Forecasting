@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
+import torch.optim.lr_scheduler as lr_scheduler
 
 from transformer_dataset import TSDataset, prepare_time_series_data, scale_data_seq, create_lags
 from model import TransformerDecoderOnly
@@ -135,6 +136,8 @@ def train_model(cfg):
     writer = SummaryWriter(cfg['experiment_name'])
 
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg['lr'], eps=1e-9)
+    scheduler = lr_scheduler.LinearLR(
+        optimizer, start_factor=1.0, end_factor=0.1, total_iters=30)
 
     # If the user specified a model to preload before training, load it
     initial_epoch = 0
@@ -181,7 +184,7 @@ def train_model(cfg):
 
             global_step += 1
         
-
+        scheduler.step()
         txt_msg = f"Training loss of epoch {epoch}: {epoch_loss/len(train_dataloader)}"
         batch_iterator.write(txt_msg)
 
@@ -207,6 +210,8 @@ def training_loop(cfg, device, train_dataloader, val_dataloader):
 
     model = get_model(cfg).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg['lr'], eps=1e-9)
+    scheduler = lr_scheduler.LinearLR(
+        optimizer, start_factor=1.0, end_factor=0.1, total_iters=30)
     loss_fn = nn.MSELoss().to(device)
 
     for _ in range(cfg['num_epochs']):
@@ -226,6 +231,8 @@ def training_loop(cfg, device, train_dataloader, val_dataloader):
 
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
+
+        scheduler.step()
 
         val_loss = loop_validation(model, device, val_dataloader)
         score.append(val_loss)
@@ -258,8 +265,10 @@ def loop_validation(model, device, validation_dataloader):
 
 def grid_search(config, device, lr_cv: float, n_epoch: int, param_grid: dict, n_iter: int = 20, n_split: int = 4, cv_dic: int = 5):
     config["num_epochs"] = n_epoch
-    config['lr'] = lr_cv
-    train_scl, _, _ = get_ds(config, return_raw=True)
+    if lr_cv != None:
+        config['lr'] = lr_cv
+    train0, val0, _ = get_ds(config, return_raw=True)
+    train_scl = train0 + val0
 
     tscv = TimeSeriesSplit(
         n_splits=n_split, test_size=int(len(train_scl)/cv_dic))
