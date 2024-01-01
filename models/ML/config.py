@@ -25,7 +25,7 @@ def get_config():
             "system_imbalance": [4*24-2*4, 7*4*24-2*4]
         },
         "diffs": None,
-        "forward_lags": False,
+        "forward_lags": True,
         "train_split": '2023-03-01 00:00:00',
         "test_split": '2023-06-01 00:00:00',
         "batch_size": 64,
