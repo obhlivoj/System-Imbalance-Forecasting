@@ -6,14 +6,16 @@ def get_config():
         "data_pickle_name": "merged_data.pkl",
         "path_pickle": "../../data/data_TS/",
         "exo_vars": [
-            "month_sin", "month_cos", "day_sin", "day_cos", "hour_sin", "hour_cos",
+            "month_sin", "month_cos", "day_sin", "day_cos", "weekday_sin", "weekday_cos",
+            "hour_sin", "hour_cos",
             "quarter_hour_sin", "quarter_hour_cos", "measured_&_upscaled_wind",
             "most_recent_forecast_wind", "total_load",
             "most_recent_forecast_load", "measured_&_upscaled_solar",
             "most_recent_forecast_solar", 'year', 'not_working', 'holiday',
         ],
         "forward_vars": [
-            "month_sin", "month_cos", "day_sin", "day_cos", "hour_sin", "hour_cos",
+            "month_sin", "month_cos", "day_sin", "day_cos", "weekday_sin", "weekday_cos",
+            "hour_sin", "hour_cos",
             "quarter_hour_sin", "quarter_hour_cos", "day-ahead_6pm_forecast_wind",
             "most_recent_forecast_wind", "day-ahead_6pm_forecast_load",
             "most_recent_forecast_load", "day-ahead_6pm_forecast_solar",
@@ -42,7 +44,7 @@ def get_config():
         "model_basename": "tmodel_",
         "preload": None,
         "experiment_name": "runs/tmodel",
-        "run": "forward",
+        "run": "final_mod",
     }
 
 def get_weights_file_path(config, epoch: str):

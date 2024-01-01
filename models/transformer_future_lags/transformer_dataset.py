@@ -7,6 +7,8 @@ from torch.utils.data import Dataset
 from sklearn.preprocessing import StandardScaler
 from copy import deepcopy
 
+import numpy as np
+
 
 class TSDataset(Dataset):
     """
@@ -116,7 +118,11 @@ def prepare_time_series_data(data: pd.DataFrame, exo_vars_enc: List[str], exo_va
     - label_tensor (Tensor): Tensor of the target labels.
     """
     data_array_encoder = data[target + exo_vars_enc].values
-    data_array_decoder = data[target + exo_vars_dec].values
+
+    data_label_shift = data[target].shift(1).values
+    data_array_decoder = data[exo_vars_dec].values
+    data_array_decoder = np.concatenate((data_label_shift, data_array_decoder), axis=1)
+    
     data_label = data[target].values
 
     data_tensor_enc = torch.tensor(data_array_encoder, dtype=torch.float32)
@@ -135,7 +141,7 @@ def prepare_time_series_data(data: pd.DataFrame, exo_vars_enc: List[str], exo_va
 
         target_start_idx = end_idx - 1
         target_end_idx = target_start_idx + target_seq_len
-        target_dec_seq = data_tensor_dec[target_start_idx:target_end_idx]
+        target_dec_seq = data_tensor_dec[target_start_idx+1:target_end_idx+1]
         ground_truth = label_tensor[target_start_idx+1:target_end_idx+1]
 
         data_seq.append({

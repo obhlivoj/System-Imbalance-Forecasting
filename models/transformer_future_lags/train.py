@@ -7,7 +7,6 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import torch.optim.lr_scheduler as lr_scheduler
 
-
 from transformer_dataset import TSDataset, causal_mask, prepare_time_series_data, scale_data_seq, create_lags
 from model import build_transformer
 
@@ -56,7 +55,7 @@ def greedy_decode(model, config, source, source_mask, decoder_in, scaler, device
         if i == config['val_seq_len']-1:
             break
         pred_new = pred[:, -1, -1]
-        scaled_pred = torch.tensor(scaler.transform(pred_new.view(-1, 1)))
+        scaled_pred = torch.tensor(scaler.transform(pred_new.view(-1, 1).cpu()))
 
         decoder_next = torch.clone(decoder_in[:, i+1, :].unsqueeze(1))
         decoder_next[:, :, 0] = scaled_pred
@@ -351,8 +350,10 @@ def loop_validation(model, config, device, validation_dataloader, scaler):
 
 def grid_search(config, device, lr_cv: float, n_epoch: int, param_grid: dict, n_iter: int = 20, n_split: int = 4, cv_dic: int = 5):
     config["num_epochs"] = n_epoch
-    config['lr'] = lr_cv
-    train_scl, _, _, scaler = get_ds(config, return_raw=True)
+    if lr_cv:
+        config['lr'] = lr_cv
+    train0, val0, _, scaler = get_ds(config, return_raw=True)
+    train_scl = train0 + val0
 
     tscv = TimeSeriesSplit(
         n_splits=n_split, test_size=int(len(train_scl)/cv_dic))
