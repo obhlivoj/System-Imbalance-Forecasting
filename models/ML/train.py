@@ -284,7 +284,8 @@ def loop_validation(model, device, validation_dataloader):
 def grid_search(config, device, lr_cv: float, n_epoch: int, param_grid: dict, n_iter: int = 20, n_split: int = 4, cv_dic: int = 5):
     config["num_epochs"] = n_epoch
     config['lr'] = lr_cv
-    train_scl, _, _ = get_ds(config, return_raw=True)
+    train0, val0, _ = get_ds(config, return_raw=True)
+    train_scl = train0 + val0
 
     tscv = TimeSeriesSplit(
         n_splits=n_split, test_size=int(len(train_scl)/cv_dic))
