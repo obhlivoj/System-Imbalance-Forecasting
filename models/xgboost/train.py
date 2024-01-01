@@ -143,10 +143,14 @@ def train_model(cfg):
     return model
 
 
-def grid_search(cfg, device, lr_cv: float, n_cv: int, param_grid: dict, n_iter: int = 20, n_split: int = 4, cv_dic: int = 5):
-    train, _, _ = get_ds(cfg)
-    x_train, y_train, _ = train
-    cfg['lr'] = lr_cv
+def grid_search(cfg, device, lr_cv, n_cv: int, param_grid: dict, n_iter: int = 20, n_split: int = 4, cv_dic: int = 5):
+    train, val, _ = get_ds(cfg)
+    x_train0, y_train0, _ = train
+    x_val0, y_val0, _ = val
+    x_train = np.concatenate((x_train0, x_val0))
+    y_train = np.concatenate((y_train0, y_val0))
+    if lr_cv:
+        cfg['lr'] = lr_cv
     cfg['n_estimators'] = n_cv
     cfg['early_stopping_rounds'] = None
     model = get_model(cfg, device)

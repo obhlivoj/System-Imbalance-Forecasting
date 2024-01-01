@@ -3,7 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
 from train import get_model, get_ds, run_validation
 from config import get_weights_file_path, get_config
 from train import get_model
@@ -309,7 +309,7 @@ def plot_k_results(seq_data: list, inds: list) -> None:
         plt.show()
 
 def compute_val_errors(preds_gt: dict, num_models: int):
-    print("Model\tRMSE\tMAE\tR2")
+    print("Model\tRMSE\tMAPE\tMAE\tR2")
 
     # create result dict
     result_dict = {}
@@ -318,10 +318,11 @@ def compute_val_errors(preds_gt: dict, num_models: int):
         result_dict[f'model_{k+1}'] = {
             "r2": r2_score(preds_gt['gt'][k].squeeze(-1), preds_gt['preds'][k]),
             "rmse": mean_squared_error(preds_gt['gt'][k].squeeze(-1), preds_gt['preds'][k], squared=False),
+            "mape": mean_absolute_percentage_error(preds_gt['gt'][k].squeeze(-1), preds_gt['preds'][k]),
             "mae": mean_absolute_error(preds_gt['gt'][k].squeeze(-1), preds_gt['preds'][k]),
             }
 
-        print(f'{k+1}\t{result_dict[f"model_{k+1}"]["rmse"]:.2f}\t{result_dict[f"model_{k+1}"]["mae"]:.2f}\t{result_dict[f"model_{k+1}"]["r2"]:.2f}')
+        print(f'{k+1}\t{result_dict[f"model_{k+1}"]["rmse"]:.2f}\t{result_dict[f"model_{k+1}"]["mape"]:.2f}\t{result_dict[f"model_{k+1}"]["mae"]:.2f}\t{result_dict[f"model_{k+1}"]["r2"]:.2f}')
 
     return result_dict
 
