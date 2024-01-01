@@ -180,8 +180,8 @@ def train_model(config):
     writer = SummaryWriter(config['experiment_name'])
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], eps=1e-9)
-    #scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.1, total_iters=30)
-    #scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.75)
+    scheduler = lr_scheduler.LinearLR(
+        optimizer, start_factor=1.0, end_factor=0.1, total_iters=30)
 
     # If the user specified a model to preload before training, load it
     initial_epoch = 0
@@ -244,7 +244,7 @@ def train_model(config):
 
             global_step += 1
 
-        #scheduler.step()
+        scheduler.step()
         txt_msg = f"Training loss of epoch {epoch}: {epoch_loss/len(train_dataloader)}"
         batch_iterator.write(txt_msg)
 
@@ -349,7 +349,8 @@ def grid_search(config, device, lr_cv: float, n_epoch: int, param_grid: dict, n_
     config["num_epochs"] = n_epoch
     if lr_cv != None:
         config['lr'] = lr_cv
-    train_scl, _, _, scaler = get_ds(config, return_raw=True)
+    train0, val0, _, scaler = get_ds(config, return_raw=True)
+    train_scl = train0 + val0
 
     tscv = TimeSeriesSplit(
         n_splits=n_split, test_size=int(len(train_scl)/cv_dic))

@@ -3,7 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
 from train import get_model, get_ds, run_validation
 from config import get_weights_file_path, get_config
 from train import get_model
@@ -174,7 +174,7 @@ def get_best_model(cfg, path_pre: str, num_models: int = 8) -> Tuple[List[float]
     for k in range(1, num_models + 1):
         cfg['run'] = k
 
-        gen_path = f'{path_pre}{cfg["run"]}/'
+        gen_path = f'{path_pre}{k}/'
         loss_paths = [f'{gen_path}training_loss.txt', f'{gen_path}val_loss.txt']
 
         files = {f'train_{k}': None, f'val_{k}': None}
@@ -286,8 +286,11 @@ def plot_results(seq_datapoint: dict, num_models: int, history_len: int) -> plt.
     # Add loss
     rmse_loss = mean_squared_error(seq_datapoint['true'], seq_datapoint['pred'], squared=False)
     mae_loss = mean_absolute_error(seq_datapoint['true'], seq_datapoint['pred'])
+    mape_loss = mean_absolute_percentage_error(seq_datapoint['true'], seq_datapoint['pred'])
 
-    plt.figtext(0.14, 0.93, f'RMSE: {rmse_loss:.2f}', fontsize=12, ha='left')
+
+    plt.figtext(0.14, 0.97, f'RMSE: {rmse_loss:.2f}', fontsize=12, ha='left')
+    plt.figtext(0.14, 0.93, f'MAPE: {mape_loss:.2f}', fontsize=12, ha='left')
     plt.figtext(0.14, 0.89, f'MAE: {mae_loss:.2f}', fontsize=12, ha='left')
 
     # ax.text(-1, 220, f'RMSE: {rmse_loss:.2f}', fontsize=12, ha='left')
@@ -314,7 +317,7 @@ def plot_k_results(seq_data: list, inds: list) -> None:
         plt.show()
 
 def compute_val_errors(preds_gt: dict, num_models: int):
-    print("Step\tRMSE\tMAE\tR2")
+    print("Step\tRMSE\tMAPE\tMAE\tR2")
 
     # create result dict
     result_dict = {}
@@ -324,9 +327,10 @@ def compute_val_errors(preds_gt: dict, num_models: int):
             "r2": r2_score(preds_gt['gt'][:,k,:], preds_gt['preds'][:,k,:]),
             "rmse": mean_squared_error(preds_gt['gt'][:,k,:], preds_gt['preds'][:,k,:], squared=False),
             "mae": mean_absolute_error(preds_gt['gt'][:,k,:], preds_gt['preds'][:,k,:]),
+            "mape": mean_absolute_percentage_error(preds_gt['gt'][:,k,:], preds_gt['preds'][:,k,:])
             }
 
-        print(f'{k+1}\t{result_dict[f"time_step_{k+1}"]["rmse"]:.2f}\t{result_dict[f"time_step_{k+1}"]["mae"]:.2f}\t{result_dict[f"time_step_{k+1}"]["r2"]:.2f}')
+        print(f'{k+1}\t{result_dict[f"time_step_{k+1}"]["rmse"]:.2f}\t{result_dict[f"time_step_{k+1}"]["mape"]:.2f}\t{result_dict[f"time_step_{k+1}"]["mae"]:.2f}\t{result_dict[f"time_step_{k+1}"]["r2"]:.2f}')
 
     return result_dict
 
@@ -359,11 +363,11 @@ def arrange_figures_in_rows(n_rows: int, prefix: str, row_height: float = 3):
     fig, axs = plt.subplots(n_rows, 1, figsize=(10, row_height * n_rows))
     if n_rows > 1:
         for i in range(n_rows):
-            gen_path = f'./loss/run{prefix}{i+1}/'
+            gen_path = f'./loss/run{prefix}/'
             axs[i] = plot_loss_curve(gen_path, axs[i])
         
         fig.tight_layout()
     else:
-        gen_path = f'./loss/run{prefix}{1}/'
+        gen_path = f'./loss/run{prefix}/'
         axs = plot_loss_curve(gen_path, axs)
     plt.show()
