@@ -245,7 +245,7 @@ def validate_n_models(device, path_pre: str, param: List[str], best_models_inds:
         preds_gt["hist"] = torch.cat(src_tensor)
 
         se_loss_val = loss_se(pred_torch, gt_torch)
-        loss_validation = se_loss_val.mean(dim=0).squeeze().numpy()
+        loss_validation = se_loss_val.mean(dim=0).squeeze(0).numpy()
         loss_cat = loss
 
         print(20 * "-")

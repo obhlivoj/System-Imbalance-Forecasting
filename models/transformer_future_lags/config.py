@@ -34,8 +34,8 @@ def get_config():
         "num_epochs": 15,
         "lr": 1*10**-4,
         "src_seq_len": 32,
-        "tgt_seq_len": 8,
-        "val_seq_len": 8,
+        "tgt_seq_len": 1,
+        "val_seq_len": 1,
         "d_ff": 256,
         "n_head": 2,
         "Nx": 4,
@@ -44,7 +44,7 @@ def get_config():
         "model_basename": "tmodel_",
         "preload": None,
         "experiment_name": "runs/tmodel",
-        "run": "final_mod",
+        "run": "final_single_step",
     }
 
 def get_weights_file_path(config, epoch: str):
