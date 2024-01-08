@@ -28,7 +28,7 @@ def get_config():
         "test_split": '2023-06-01 00:00:00',
         "n_estimators": 750,
         "early_stopping_rounds": 25,
-        "lr": 6*10**-2,
+        "learning_rate": 6*10**-2,
         "src_seq_len": 32,
         "tgt_seq_len": 1,
         "max_depth": 10,
@@ -40,7 +40,7 @@ def get_config():
         "model_basename": "tmodel_",
         "preload": None,
         "experiment_name": "runs/tmodel",
-        "run": "final_nfl",
+        "run": "final_2",
     }
 
 

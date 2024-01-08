@@ -98,7 +98,7 @@ def get_model(cfg, device):
     params = {
         'objective': 'reg:squarederror',
         'max_depth': cfg["max_depth"],
-        'learning_rate': cfg["lr"],
+        'learning_rate': cfg["learning_rate"],
         'n_estimators': cfg["n_estimators"],
         'reg_alpha': cfg['reg_alpha'],
         'reg_lambda': cfg['reg_lambda'],
@@ -150,7 +150,7 @@ def grid_search(cfg, device, lr_cv, n_cv: int, param_grid: dict, n_iter: int = 2
     x_train = np.concatenate((x_train0, x_val0))
     y_train = np.concatenate((y_train0, y_val0))
     if lr_cv:
-        cfg['lr'] = lr_cv
+        cfg['learning_rate'] = lr_cv
     cfg['n_estimators'] = n_cv
     cfg['early_stopping_rounds'] = None
     model = get_model(cfg, device)
