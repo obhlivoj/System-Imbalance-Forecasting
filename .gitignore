@@ -177,5 +177,8 @@ readme.txt
 /models/transformer_decoder_only/runs_folder/
 /models/transformer_decoder_only/loss/
 /models/transformer_decoder_only/validation/
+/models/transformer_future_lags/loss/
+/models/transformer_future_lags/runs_folder/
+/models/transformer_future_lags/weights_folder/
 
 
