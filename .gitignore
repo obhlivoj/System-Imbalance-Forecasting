@@ -180,5 +180,6 @@ readme.txt
 /models/transformer_future_lags/loss/
 /models/transformer_future_lags/runs_folder/
 /models/transformer_future_lags/weights_folder/
-
+/models/xgboost/loss/
+/models/xgboost/weights_folder/
 
