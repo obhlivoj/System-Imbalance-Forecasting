@@ -1,1 +1,0 @@
-{"params": {"d_ff": [128, 256, 512], "Nx": [2, 4], "n_head": [2, 4], "dropout": [0.1, 0.25]}, "best_params": [{"d_ff": 128, "Nx": 2, "n_head": 4, "dropout": 0.25}]}
