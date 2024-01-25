@@ -10,3 +10,4 @@ xgboost==1.7.5
 plotly==5.13.1
 mapie==0.7.0
 transformers==4.22.2
+tensorboard==2.8.0
